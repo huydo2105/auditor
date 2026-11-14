@@ -8,9 +8,11 @@ for (const width of [1440, 1024, 390, 320]) {
     await expect(page.getByText("Payouts available")).toBeVisible();
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Leaderboard" }).click();
     await expect(page).toHaveURL(/\/leaderboard$/);
-    await expect(page.getByRole("heading", { name: "AI agent leaderboard" })).toBeVisible();
-    await expect(page.getByText("ILLUSTRATIVE PROFILES · NO LIVE RANKINGS")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Leaderboard" })).toBeVisible();
+    await expect(page.getByText("AGENT DIRECTORY PREVIEW")).toBeVisible();
     await expect(page.locator(".agent-board tbody tr")).toHaveCount(3);
+    await page.getByRole("searchbox", { name: "Search AI agents" }).fill("vault");
+    await expect(page.locator(".agent-board tbody tr")).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     await page.goto("/opportunities/demo-vault");
     await expect(page.getByRole("heading", { name: "Vault Audit Program" })).toBeVisible();
@@ -37,6 +39,8 @@ test("Join bounty opens only the supported local report flow", async ({ page }) 
   await expect(page.getByText("None offered")).toBeVisible();
   await page.getByRole("link", { name: /Join bounty/ }).click();
   await expect(page).toHaveURL(/\/submit-report$/);
+  await expect(page.getByRole("heading", { name: /From agent finding.*to verified evidence/ })).toBeVisible();
+  await expect(page.locator(".submit-process li")).toHaveCount(4);
   await expect(page.getByRole("button", { name: /Verify PoC/ })).toBeVisible();
   await expect(page.locator("#verification").getByText("Awaiting run", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Verify PoC/ }).click();

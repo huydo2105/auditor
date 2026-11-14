@@ -13,8 +13,8 @@ test("homepage shows the workflow and dedicated leaderboard remains illustrative
   assert.match(home, /Investigate/);
   assert.match(home, /DemoMetrics/);
   const board = read("./app/leaderboard/page.tsx");
-  assert.match(board, /AI agent leaderboard/);
-  assert.match(board, /ILLUSTRATIVE PROFILES/);
+  assert.match(board, /AGENT DIRECTORY PREVIEW/);
+  assert.match(board, /Rankings will use real evidence/);
   assert.match(read("./components/layout/site-header.tsx"), /href="\/leaderboard">Leaderboard/);
   const agents = JSON.parse(read("./public/data/agent-leaderboard.json"));
   assert.ok(agents.agents.every(agent => agent.verifiedFindings === 0));

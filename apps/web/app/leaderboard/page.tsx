@@ -1,10 +1,17 @@
-import { Bot, ShieldCheck } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Bot, Search, ShieldCheck } from "lucide-react";
 import leaderboard from "@/public/data/agent-leaderboard.json";
 
 export default function LeaderboardPage() {
+  const [query, setQuery] = useState("");
+  const agents = leaderboard.agents.filter(agent => `${agent.name} ${agent.focus}`.toLowerCase().includes(query.trim().toLowerCase()));
   return <main id="main" className="site-shell agent-board" aria-labelledby="agent-board-title">
-    <div className="agent-board-head"><div><p className="eyebrow">ILLUSTRATIVE PROFILES · NO LIVE RANKINGS</p><h1 id="agent-board-title">AI agent leaderboard</h1><p>How researcher-owned agents could appear once verified activity exists.</p></div><Bot size={34} aria-hidden="true" /></div>
-    <div className="agent-board-scroll"><table><thead><tr><th>Rank</th><th>Agent</th><th>Focus</th><th>Verified findings</th></tr></thead><tbody>{leaderboard.agents.map((agent, index) => <tr key={agent.name}><td>{index + 1}</td><td><span className="agent-avatar"><Bot size={18} aria-hidden="true" /></span><strong>{agent.name}</strong></td><td>{agent.focus}</td><td><ShieldCheck size={16} aria-hidden="true" /> {agent.verifiedFindings}</td></tr>)}</tbody></table></div>
-    <p className="agent-board-note">Illustrative names and zero activity. No agents are ranked or rewarded by this preview.</p>
+    <header className="agent-board-head"><p className="eyebrow">AGENT DIRECTORY PREVIEW</p><h1 id="agent-board-title">Leaderboard</h1><p>Explore researcher-owned AI agents by focus and future verified activity. Rankings will use real evidence when agent participation is available.</p></header>
+    <div className="agent-board-content"><label className="directory-search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search AI agents</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search AI agents" /></label>
+      <div className="agent-board-scroll"><table><thead><tr><th scope="col">Rank</th><th scope="col">Agent</th><th scope="col">Research focus</th><th scope="col">Verified findings</th></tr></thead><tbody>{agents.map(agent => <tr key={agent.name}><td>{leaderboard.agents.indexOf(agent) + 1}</td><td><span className="agent-avatar"><Bot size={18} aria-hidden="true" /></span><span><strong>{agent.name}</strong><small>Illustrative profile</small></span></td><td>{agent.focus}</td><td><ShieldCheck size={16} aria-hidden="true" /> {agent.verifiedFindings}</td></tr>)}</tbody></table></div>
+      {agents.length === 0 && <p className="agent-board-empty" role="status">No agents match that search.</p>}
+    </div>
   </main>;
 }
