@@ -56,7 +56,7 @@ test("vault detail shows honest fixture data and sends submissions to the shared
   assert.match(journey, /role="tablist"/);
   assert.match(journey, /href="\/submit-report"/);
   assert.match(journey, /Runnable fixture/);
-  assert.match(read("./app/submit-report/page.tsx"), /<VerificationConsole embedded/);
+  assert.match(read("./app/submit-report/page.tsx"), /<ReportWizard \/>/);
   assert.match(read("./app/how-it-works/page.tsx"), /researcher-owned|your own AI agent/);
   const program = JSON.parse(read("./public/data/vault-program.json"));
   assert.equal(program.reward, "None offered");

@@ -17,6 +17,11 @@ for (const width of [1440, 1024, 390, 320]) {
     await page.goto("/opportunities/demo-vault");
     await expect(page.getByRole("heading", { name: "Vault Audit Program" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    await page.goto("/submit-report");
+    await expect(page.getByRole("heading", { name: /Turn an agent finding.*into evidence/ })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    await page.getByRole("button", { name: "Continue to agent brief" }).click();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   });
 }
 
@@ -39,8 +44,18 @@ test("Join bounty opens only the supported local report flow", async ({ page }) 
   await expect(page.getByText("None offered")).toBeVisible();
   await page.getByRole("link", { name: /Join bounty/ }).click();
   await expect(page).toHaveURL(/\/submit-report$/);
-  await expect(page.getByRole("heading", { name: /From agent finding.*to verified evidence/ })).toBeVisible();
-  await expect(page.locator(".submit-process li")).toHaveCount(4);
+  await expect(page.getByRole("heading", { name: /Turn an agent finding.*into evidence/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Finding preparation steps" }).getByRole("button")).toHaveCount(4);
+  await page.getByRole("button", { name: "Continue to agent brief" }).click();
+  await expect(page.getByRole("heading", { name: "Give your agent a bounded brief." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Give your agent a bounded brief." })).toBeFocused();
+  await page.getByRole("button", { name: "Copy brief" }).click();
+  await expect(page.getByRole("status")).toContainText("Agent brief copied");
+  await page.getByRole("button", { name: "Draft a finding" }).click();
+  await page.getByRole("button", { name: "Review and verify" }).click();
+  await expect(page.locator(".report-field-error")).toContainText("Complete the required finding fields");
+  await expect(page.getByLabel("Claim title")).toBeFocused();
+  await page.getByRole("button", { name: "Skip draft" }).click();
   await expect(page.getByRole("button", { name: /Verify PoC/ })).toBeVisible();
   await expect(page.locator("#verification").getByText("Awaiting run", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Verify PoC/ }).click();
@@ -49,6 +64,29 @@ test("Join bounty opens only the supported local report flow", async ({ page }) 
   await page.getByRole("button", { name: /Verify PoC/ }).click();
   await expect(page.locator("#verification").getByRole("alert")).toContainText(/verification API is unavailable|API token rejected/i, { timeout: 20000 });
   await expect(page.locator("#verification").getByText("Awaiting run", { exact: true })).toBeVisible();
+});
+
+test("researcher draft is local, reviewable, and cleared on reload", async ({ page }) => {
+  const posts: string[] = [];
+  page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+  await page.goto("/submit-report");
+  await page.getByRole("button", { name: "Continue to agent brief" }).click();
+  await page.getByRole("button", { name: "Draft a finding" }).click();
+  for (const [label, value] of [
+    ["Claim title", "Share inflation"], ["Affected code location", "FixtureVault.sol:deposit"],
+    ["Root cause and preconditions", "Donation before victim deposit"], ["Observed or expected impact", "Victim receives no shares"],
+    ["Security invariant", "Victim receives positive shares"], ["Reproduction steps and PoC reference", "Run reviewed vault oracle"],
+  ]) await page.getByLabel(label).fill(value);
+  await page.getByRole("button", { name: "Review and verify" }).click();
+  await expect(page.getByText("Unsent finding draft")).toBeVisible();
+  await expect(page.getByText("Share inflation", { exact: true })).toBeVisible();
+  expect(posts).toEqual([]);
+  await page.getByRole("button", { name: "Edit draft" }).click();
+  await expect(page.getByLabel("Claim title")).toHaveValue("Share inflation");
+  await page.reload();
+  await page.getByRole("button", { name: "Continue to agent brief" }).click();
+  await page.getByRole("button", { name: "Draft a finding" }).click();
+  await expect(page.getByLabel("Claim title")).toHaveValue("");
 });
 
 test("directory keeps runnable fixture distinct from unavailable previews", async ({ page }) => {

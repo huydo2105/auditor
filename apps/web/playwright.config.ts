@@ -1,16 +1,18 @@
 import { defineConfig } from "@playwright/test";
 
+const existingServer = process.env.VERIPOC_WEB_TEST_ORIGIN;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
   use: {
-    baseURL: "http://127.0.0.1:3100",
+    baseURL: existingServer ?? "http://127.0.0.1:3100",
     browserName: "chromium",
     channel: process.env.CI ? undefined : "chrome",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
-  webServer: {
+  webServer: existingServer ? undefined : {
     command: "npm run dev -- --port 3100",
     url: "http://127.0.0.1:3100",
     reuseExistingServer: !process.env.CI,
