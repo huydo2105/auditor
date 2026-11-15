@@ -40,6 +40,11 @@ test("opportunity tabs show reviewed instructions and scope", async ({ page }) =
 });
 
 test("Join bounty opens only the supported local report flow", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async (value: string) => { sessionStorage.setItem("copied-agent-brief", value); },
+    } });
+  });
   await page.goto("/opportunities/demo-vault");
   await expect(page.getByText("None offered")).toBeVisible();
   await page.getByRole("link", { name: /Join bounty/ }).click();
@@ -51,6 +56,7 @@ test("Join bounty opens only the supported local report flow", async ({ page }) 
   await expect(page.getByRole("heading", { name: "Give your agent a bounded brief." })).toBeFocused();
   await page.getByRole("button", { name: "Copy brief" }).click();
   await expect(page.getByRole("status")).toContainText("Agent brief copied");
+  expect(await page.evaluate(() => sessionStorage.getItem("copied-agent-brief"))).toContain("contracts/evm/FixtureVault.sol");
   await page.getByRole("button", { name: "Draft a finding" }).click();
   await page.getByRole("button", { name: "Review and verify" }).click();
   await expect(page.locator(".report-field-error")).toContainText("Complete the required finding fields");
@@ -87,6 +93,19 @@ test("researcher draft is local, reviewable, and cleared on reload", async ({ pa
   await page.getByRole("button", { name: "Continue to agent brief" }).click();
   await page.getByRole("button", { name: "Draft a finding" }).click();
   await expect(page.getByLabel("Claim title")).toHaveValue("");
+});
+
+test("agent brief stays readable when clipboard permission is unavailable", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async () => { throw new Error("clipboard denied"); },
+    } });
+  });
+  await page.goto("/submit-report");
+  await page.getByRole("button", { name: "Continue to agent brief" }).click();
+  await page.getByRole("button", { name: "Copy brief" }).click();
+  await expect(page.getByRole("status")).toContainText("Select and copy the brief below");
+  await expect(page.locator(".report-agent-brief")).toContainText("contracts/evm/FixtureVault.sol");
 });
 
 test("directory keeps runnable fixture distinct from unavailable previews", async ({ page }) => {
