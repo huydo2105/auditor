@@ -21,13 +21,18 @@ test("homepage shows the workflow and dedicated leaderboard remains illustrative
   assert.doesNotMatch(home, /Choose your path|Two perspectives|Explore workflow|scanner dashboard|scan contract|type="file"/i);
 });
 
-test("opportunities list all entries and only the reviewed vault opens a detail route", () => {
+test("opportunities distinguish public source references from the runnable vault", () => {
   assert.match(read("./app/get-started/page.tsx"), /OpportunityList/);
   assert.match(read("./app/opportunities/demo-vault/page.tsx"), /<RoleJourney \/>/);
   const list = read("./components/opportunities/opportunity-list.tsx");
   assert.match(list, /href="\/opportunities\/demo-vault"/);
   assert.match(list, /Runnable demo/);
-  assert.match(list, /Preview · unavailable/);
+  assert.match(list, /Read-only source/);
+  assert.match(list, /Public source/);
+  assert.match(list, /Practice labs/);
+  assert.match(list, /noopener noreferrer/);
+  assert.match(list, /Public repositories are source references, not VeriPoC audit programs/);
+  assert.doesNotMatch(list, /Lending market review|AMM pool review|Preview · unavailable/);
   assert.match(list, /No bounty/);
   assert.match(list, /Bounties/);
   assert.match(list, /Competitions/);

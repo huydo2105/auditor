@@ -108,15 +108,43 @@ test("agent brief stays readable when clipboard permission is unavailable", asyn
   await expect(page.locator(".report-agent-brief")).toContainText("contracts/evm/FixtureVault.sol");
 });
 
-test("directory keeps runnable fixture distinct from unavailable previews", async ({ page }) => {
+test("directory keeps public source references distinct from the runnable fixture", async ({ page }) => {
   await page.goto("/get-started");
-  await expect(page.locator(".directory-row")).toHaveCount(3);
+  await expect(page.locator(".directory-row")).toHaveCount(9);
+  await expect(page.locator(".directory-source")).toHaveCount(8);
+  await expect(page.getByText("Public repositories are source references, not VeriPoC audit programs.")).toBeVisible();
+  const uniswap = page.getByRole("link", { name: /Open official source for Uniswap v4 Core/ });
+  await expect(uniswap).toHaveAttribute("href", /^https:\/\/github\.com\/Uniswap\/v4-core\/tree\/[a-f0-9]{40}$/);
+  await expect(uniswap).toHaveAttribute("rel", "noopener noreferrer");
+  await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Public source/ }).click();
+  await expect(page.locator(".directory-source")).toHaveCount(6);
+  await expect(page.getByRole("link", { name: "Open Demo Vault Audit Program details" })).toHaveCount(0);
+  await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Practice labs/ }).click();
+  await expect(page.locator(".directory-source")).toHaveCount(2);
+  await page.getByRole("searchbox", { name: "Search opportunities" }).fill("Ethernaut");
+  await expect(page.locator(".directory-source")).toHaveCount(1);
+  await page.getByRole("searchbox", { name: "Search opportunities" }).fill("no such repository");
+  await expect(page.getByRole("status")).toContainText("No matching entries");
+  await page.getByRole("searchbox", { name: "Search opportunities" }).clear();
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Bounties/ }).click();
   await expect(page.getByRole("status")).toContainText("There are no live bounties");
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /All/ }).click();
   await page.getByRole("link", { name: "Open Demo Vault Audit Program details" }).click();
   await expect(page).toHaveURL(/\/opportunities\/demo-vault$/);
 });
+
+for (const width of [1440, 1024, 390, 320]) {
+  test(`public source directory fits ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/get-started");
+    await expect(page.locator(".directory-source")).toHaveCount(8);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Practice labs/ }).focus();
+    await expect(page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Practice labs/ })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".directory-source")).toHaveCount(2);
+  });
+}
 
 test("public scope remains readable without JavaScript", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, javaScriptEnabled: false });

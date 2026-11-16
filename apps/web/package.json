@@ -9,7 +9,7 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
-    "test:unit": "tsx --test state.test.mjs journeys.test.mjs lib/backend-url.test.ts lib/proxy.test.ts",
+    "test:unit": "tsx --test state.test.mjs journeys.test.mjs public-sources.test.mjs lib/backend-url.test.ts lib/proxy.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

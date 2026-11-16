@@ -455,6 +455,8 @@ summary { cursor: pointer; }
 .directory-search input { width: 100%; height: 44px; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: .85rem; }
 .directory-search:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .directory-row { display: block; min-height: 0; padding: 0; overflow: hidden; border-radius: 12px; }
+.directory-source { transition: border-color .18s ease, background-color .18s ease; }
+.directory-source:hover { border-color: var(--accent); background: var(--accent-soft); }
 .directory-row-main { display: flex; align-items: center; gap: 14px; padding: 18px 20px; }
 .directory-mark { width: 42px; height: 42px; background: #f7f7f4; }
 .directory-mark-muted { background: var(--page); }
@@ -467,6 +469,7 @@ summary { cursor: pointer; }
 .directory-row-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 13px; min-height: 42px; padding: 9px 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: .73rem; }
 .directory-badge { padding: 3px 8px; border-radius: 999px; }
 .directory-date { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--ink); }
+.directory-revision code { font-size: inherit; }
 .directory-preview-description { margin-left: auto; }
 .directory-promo { margin: 0; padding: 45px 25px; border-radius: 13px; background: var(--accent-soft); text-align: center; }
 .directory-promo h2 { margin-top: 9px; font-size: clamp(1.7rem, 3vw, 2.7rem); font-weight: 750; letter-spacing: -.055em; line-height: 1.1; }

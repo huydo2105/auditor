@@ -1,0 +1,74 @@
+[
+  {
+    "id": "openzeppelin-contracts",
+    "title": "OpenZeppelin Contracts",
+    "owner": "OpenZeppelin",
+    "kind": "protocol",
+    "description": "Reusable Solidity contract library",
+    "repository": "OpenZeppelin/openzeppelin-contracts",
+    "revision": "7df9390d5989ea2cb7a70ad93f96245d8a82574e"
+  },
+  {
+    "id": "uniswap-v4-core",
+    "title": "Uniswap v4 Core",
+    "owner": "Uniswap",
+    "kind": "protocol",
+    "description": "AMM core smart contracts",
+    "repository": "Uniswap/v4-core",
+    "revision": "bea7f6d1c11cd5dc4f0d5151ffa37a1c239feee6"
+  },
+  {
+    "id": "aave-v3-origin",
+    "title": "Aave V3 Origin",
+    "owner": "Aave DAO",
+    "kind": "protocol",
+    "description": "Aave V3 lending protocol source",
+    "repository": "aave-dao/aave-v3-origin",
+    "revision": "8305565ae342f1773c42cd2e4593f175fe5968a0"
+  },
+  {
+    "id": "compound-comet",
+    "title": "Compound Comet",
+    "owner": "Compound Finance",
+    "kind": "protocol",
+    "description": "Compound III money market source",
+    "repository": "compound-finance/comet",
+    "revision": "f766f51583c23acc33b2a7824654ef2029a96804"
+  },
+  {
+    "id": "solady",
+    "title": "Solady",
+    "owner": "Vectorized",
+    "kind": "protocol",
+    "description": "Optimized Solidity library",
+    "repository": "Vectorized/solady",
+    "revision": "258f67cc71e39cff307b726939ade17e9d8bcf5c"
+  },
+  {
+    "id": "lido-core",
+    "title": "Lido Core",
+    "owner": "Lido",
+    "kind": "protocol",
+    "description": "Lido DAO smart-contract source",
+    "repository": "lidofinance/core",
+    "revision": "2bd532298d85cdf520169fdc0c5fb0cc9baf03c3"
+  },
+  {
+    "id": "damn-vulnerable-defi",
+    "title": "Damn Vulnerable DeFi",
+    "owner": "The Red Guild",
+    "kind": "practice",
+    "description": "Intentionally vulnerable security training source",
+    "repository": "theredguild/damn-vulnerable-defi",
+    "revision": "64fddf9f96de2782f8868898d68673acb295119c"
+  },
+  {
+    "id": "ethernaut",
+    "title": "Ethernaut",
+    "owner": "OpenZeppelin",
+    "kind": "practice",
+    "description": "Solidity security wargame source",
+    "repository": "OpenZeppelin/ethernaut",
+    "revision": "d05643a40aa98c45d66247c69ffceab8f44dd8cb"
+  }
+]
