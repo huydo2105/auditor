@@ -110,12 +110,23 @@ test("agent brief stays readable when clipboard permission is unavailable", asyn
 
 test("directory keeps public source references distinct from the runnable fixture", async ({ page }) => {
   await page.goto("/get-started");
-  await expect(page.locator(".directory-row")).toHaveCount(9);
-  await expect(page.locator(".directory-source")).toHaveCount(8);
+  await expect(page.locator(".directory-row")).toHaveCount(11);
+  await expect(page.locator(".directory-source")).toHaveCount(10);
+  await expect(page.getByText("Showing 11 entries")).toBeVisible();
+  await expect(page.locator(".directory-source").first()).toBeVisible();
   await expect(page.getByText("Public repositories are source references, not VeriPoC audit programs.")).toBeVisible();
   const uniswap = page.getByRole("link", { name: /Open official source for Uniswap v4 Core/ });
   await expect(uniswap).toHaveAttribute("href", /^https:\/\/github\.com\/Uniswap\/v4-core\/tree\/[a-f0-9]{40}$/);
   await expect(uniswap).toHaveAttribute("rel", "noopener noreferrer");
+  await page.getByRole("group", { name: "Filter by ecosystem" }).getByRole("button", { name: /Solana/ }).click();
+  await expect(page.locator(".directory-source")).toHaveCount(2);
+  await expect(page.getByText("Showing 2 entries")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open official source for Orca Whirlpools/ })).toHaveAttribute("href", /^https:\/\/github\.com\/orca-so\/whirlpools\/tree\/[a-f0-9]{40}$/);
+  await expect(page.getByRole("link", { name: /Open official source for Raydium CP Swap/ })).toHaveAttribute("href", /^https:\/\/github\.com\/raydium-io\/raydium-cp-swap\/tree\/[a-f0-9]{40}$/);
+  await expect(page.getByRole("link", { name: "Open Demo Vault Audit Program details" })).toHaveCount(0);
+  await page.getByRole("group", { name: "Filter by ecosystem" }).getByRole("button", { name: /Ethereum \/ EVM/ }).click();
+  await expect(page.locator(".directory-source")).toHaveCount(8);
+  await expect(page.getByRole("link", { name: "Open Demo Vault Audit Program details" })).toBeVisible();
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Public source/ }).click();
   await expect(page.locator(".directory-source")).toHaveCount(6);
   await expect(page.getByRole("link", { name: "Open Demo Vault Audit Program details" })).toHaveCount(0);
@@ -137,7 +148,7 @@ for (const width of [1440, 1024, 390, 320]) {
   test(`public source directory fits ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/get-started");
-    await expect(page.locator(".directory-source")).toHaveCount(8);
+  await expect(page.locator(".directory-source")).toHaveCount(10);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Practice labs/ }).focus();
     await expect(page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Practice labs/ })).toBeFocused();
