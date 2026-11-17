@@ -37,7 +37,6 @@ export function FixtureCodeCard() {
     <div className="fixture-editor-tabs" role="group" aria-label="Compare reviewed vault implementations">
       {(["vulnerable", "patched"] as const).map(option => <button key={option} type="button" className="focus-ring" aria-pressed={variant === option} onClick={() => setVariant(option)}>{examples[option].name}</button>)}
     </div>
-    <div className="fixture-editor-body"><p className="editor-caption">Reviewed local fixture · formatted source excerpt</p><pre><code>{selected.code}</code></pre><p className="editor-note">{selected.note}</p></div>
-    <div className="fixture-editor-bottom"><span>Code selection never runs Foundry.</span><Link href="/opportunities/demo-vault" className="focus-ring">View scope <ArrowUpRight size={15} aria-hidden="true" /></Link></div>
+    <div className="fixture-editor-body"><pre><code>{selected.code}</code></pre><p className="editor-note">{selected.note}</p></div>
   </div>;
 }
