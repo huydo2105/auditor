@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import bounties from "@/public/data/bug-bounties.json";
 import { NetworkBadge } from "@/components/opportunities/network-badge";
 import { ExternalBountyTabs } from "@/components/opportunities/external-bounty-tabs";
@@ -20,8 +20,8 @@ export default async function BountyPage({ params }: { params: Promise<{ slug: s
   if (!bounty) notFound();
   return <main id="main" className="site-shell opportunity-detail external-bounty-detail">
     <Link href="/get-started" className="back-link focus-ring"><ArrowLeft size={16} aria-hidden="true" /> All opportunities</Link>
-    <header className="opportunity-detail-header"><div className="opportunity-identity"><span className="opportunity-identity-mark" aria-hidden="true">{bounty.title.slice(0, 1)}</span><div><p className="eyebrow">External bug bounty · Immunefi</p><h1>{bounty.title}</h1><div className="opportunity-tags">{bounty.ecosystems.map(network => <NetworkBadge key={network} ecosystem={network} />)}<span>PoC required</span></div></div></div><p>{bounty.description}</p></header>
+    <header className="opportunity-detail-header"><div className="opportunity-identity"><span className="opportunity-identity-mark" aria-hidden="true">{bounty.title.slice(0, 1)}</span><div><h1>{bounty.title}</h1><div className="opportunity-tags">{bounty.ecosystems.map(network => <NetworkBadge key={network} ecosystem={network} />)}<span>PoC required</span></div></div></div><p>{bounty.description}</p></header>
     <div className="opportunity-detail-layout"><div className="opportunity-detail-main"><ExternalBountyTabs bounty={bounty} /></div>
-      <aside className="opportunity-detail-aside" aria-label="Bounty summary"><p className="eyebrow">Published on Immunefi</p><h2>Program details</h2><dl><div><dt>Maximum bounty</dt><dd>{bounty.maximumReward}</dd></div><div><dt>Submission</dt><dd>Immunefi</dd></div><div><dt>Summary checked</dt><dd>{bounty.checkedAt}</dd></div></dl><p>Review the current official rules, scope and eligibility before testing. Your agent can investigate permitted public material locally; confidential reports go to the program owner through Immunefi.</p><a className="site-action site-action-dark focus-ring" href={bounty.programUrl} target="_blank" rel="noopener noreferrer" aria-label={`Join ${bounty.title} bounty on Immunefi (new tab)`}>Join bounty on Immunefi <ArrowUpRight size={16} aria-hidden="true" /></a></aside></div>
+      <aside className="opportunity-detail-aside" aria-label="Bounty summary"><h2>Program details</h2><dl><div><dt>Maximum bounty</dt><dd>{bounty.maximumReward}</dd></div><div><dt>Submission host</dt><dd>Immunefi</dd></div><div><dt>Summary checked</dt><dd>{bounty.checkedAt}</dd></div></dl><p>Read the current rules and scope before preparing a finding.</p><Link className="site-action site-action-dark focus-ring" href={`/submit-report?bounty=${bounty.id}`}>Join bounty <ArrowRight size={16} aria-hidden="true" /></Link></aside></div>
   </main>;
 }

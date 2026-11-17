@@ -45,12 +45,16 @@ test("catalog cards never route external sources to VeriPoC submission or execut
   assert.doesNotMatch(component, /fetch\(|type="file"|href="\/submit-report"|href="\/verify"/);
 });
 
-test("external bounty detail sends joining to Immunefi and keeps agent work client-owned", () => {
+test("external bounty joins through a guarded local draft, not the vault verifier", () => {
   const page = readFileSync(new URL("./app/opportunities/[slug]/page.tsx", import.meta.url), "utf8");
   const tabs = readFileSync(new URL("./components/opportunities/external-bounty-tabs.tsx", import.meta.url), "utf8");
-  assert.match(page, /Join bounty on Immunefi/);
-  assert.match(page, /href=\{bounty\.programUrl\}/);
-  assert.match(tabs, /Use your agent/);
-  assert.match(tabs, /navigator\.clipboard\.writeText/);
-  assert.doesNotMatch(page + tabs, /href="\/submit-report"|href="\/verify"|fetch\(|type="file"/);
+  const route = readFileSync(new URL("./app/submit-report/page.tsx", import.meta.url), "utf8");
+  const draft = readFileSync(new URL("./components/journeys/external-report-draft.tsx", import.meta.url), "utf8");
+  assert.match(page, /Join bounty/);
+  assert.match(page, /submit-report\?bounty=\$\{bounty\.id\}/);
+  assert.doesNotMatch(page, /External bug bounty|Join bounty on Immunefi/);
+  assert.doesNotMatch(tabs, /Use your agent/);
+  assert.match(route, /if \(!bounty\) notFound\(\)/);
+  assert.match(draft, /Continue on Immunefi/);
+  assert.doesNotMatch(draft, /VerificationConsole|fetch\(|type="file"/);
 });
