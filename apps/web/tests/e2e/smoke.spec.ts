@@ -139,7 +139,7 @@ test("directory shows real external bounties and one separate runnable fixture",
   await expect(bountyTabs.getByRole("tab", { name: "Use your agent" })).toHaveCount(0);
   await join.click();
   await expect(page).toHaveURL(/\/submit-report\?bounty=raydium$/);
-  await expect(page.getByRole("heading", { name: "Prepare a finding for Raydium." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Turn a finding into a report." })).toBeVisible();
   await expect(page.getByRole("button", { name: /Verify PoC/ })).toHaveCount(0);
   await page.getByRole("link", { name: "Raydium scope" }).click();
   await expect(page).toHaveURL(/\/opportunities\/raydium$/);
@@ -168,11 +168,16 @@ test("external report draft stays local and never starts a verifier job", async 
     } });
   });
   await page.goto("/submit-report?bounty=orca");
+  await expect(page.getByRole("navigation", { name: "Finding preparation steps" }).getByRole("button")).toHaveCount(4);
+  await page.getByRole("button", { name: "Continue to agent brief" }).click();
+  await expect(page.getByRole("heading", { name: "Give your agent a bounded brief." })).toBeFocused();
+  await page.getByRole("button", { name: "Draft a finding" }).click();
   await page.getByLabel("Finding title").fill("Candidate accounting issue");
   await page.getByLabel("Affected asset and revision").fill("Official Orca scoped asset at reviewed revision");
   await page.getByLabel("Impact and broken invariant").fill("Candidate impact requiring local reproduction");
   await page.getByLabel("Reproduction steps and PoC").fill("Local test steps and observations");
   await page.getByRole("button", { name: "Review finding" }).click();
+  await expect(page.getByRole("heading", { name: "Review before submission." })).toBeFocused();
   await page.getByRole("button", { name: "Copy report" }).click();
   await expect(page.getByRole("status")).toContainText("Draft copied");
   const copied = await page.evaluate(() => sessionStorage.getItem("external-report-draft"));

@@ -460,14 +460,6 @@ summary { cursor: pointer; }
 .external-bounty-panel { min-height: 320px; }
 .external-bounty-panel ol { padding-left: 22px; }
 .external-bounty-panel .site-action { margin-top: 22px; }
-.external-report-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 28px; align-items: start; margin-top: 30px; }
-.external-report-rules { padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.external-report-rules h2 { font-size: 1.1rem; }
-.external-report-rules ul { padding-left: 19px; margin: 15px 0; color: var(--muted); font-size: .85rem; line-height: 1.6; }
-.external-report-rules li + li { margin-top: 10px; }
-.external-report-rules .external-program-link { margin-top: 12px; }
-.external-report-draft .report-stage { min-width: 0; }
-@media (max-width: 760px) { .external-report-layout { grid-template-columns: 1fr; } }
 .external-bounty-detail .opportunity-detail-aside dd { text-align: right; }
 .directory-content .demo-metrics { margin-bottom: 22px; }
 .directory-chain-filter { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 13px; }

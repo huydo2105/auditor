@@ -55,6 +55,8 @@ test("external bounty joins through a guarded local draft, not the vault verifie
   assert.doesNotMatch(page, /External bug bounty|Join bounty on Immunefi/);
   assert.doesNotMatch(tabs, /Use your agent/);
   assert.match(route, /if \(!bounty\) notFound\(\)/);
+  assert.match(draft, /report-wizard-layout/);
+  assert.match(draft, /Finding preparation steps/);
   assert.match(draft, /Continue on Immunefi/);
   assert.doesNotMatch(draft, /VerificationConsole|fetch\(|type="file"/);
 });
