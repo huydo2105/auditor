@@ -15,3 +15,4 @@ artifacts/
 coverage/
 lcov.info
 .DS_Store
+.agents/
