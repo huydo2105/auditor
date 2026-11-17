@@ -1,6 +1,7 @@
 [
   {
     "id": "openzeppelin-contracts",
+    "logo": "/projects/openzeppelin.png",
     "title": "OpenZeppelin Contracts",
     "owner": "OpenZeppelin",
     "kind": "protocol",
@@ -11,6 +12,7 @@
   },
   {
     "id": "uniswap-v4-core",
+    "logo": "/projects/uniswap.png",
     "title": "Uniswap v4 Core",
     "owner": "Uniswap",
     "kind": "protocol",
@@ -21,6 +23,7 @@
   },
   {
     "id": "aave-v3-origin",
+    "logo": "/projects/aave.png",
     "title": "Aave V3 Origin",
     "owner": "Aave DAO",
     "kind": "protocol",
@@ -31,6 +34,7 @@
   },
   {
     "id": "compound-comet",
+    "logo": "/projects/compound.png",
     "title": "Compound Comet",
     "owner": "Compound Finance",
     "kind": "protocol",
@@ -41,6 +45,7 @@
   },
   {
     "id": "solady",
+    "logo": "/projects/solady.svg",
     "title": "Solady",
     "owner": "Vectorized",
     "kind": "protocol",
@@ -51,6 +56,7 @@
   },
   {
     "id": "lido-core",
+    "logo": "/projects/lido.png",
     "title": "Lido Core",
     "owner": "Lido",
     "kind": "protocol",
@@ -61,6 +67,7 @@
   },
   {
     "id": "damn-vulnerable-defi",
+    "logo": "/projects/theredguild.png",
     "title": "Damn Vulnerable DeFi",
     "owner": "The Red Guild",
     "kind": "practice",
@@ -71,6 +78,7 @@
   },
   {
     "id": "ethernaut",
+    "logo": "/projects/openzeppelin.png",
     "title": "Ethernaut",
     "owner": "OpenZeppelin",
     "kind": "practice",
@@ -81,6 +89,7 @@
   },
   {
     "id": "orca-whirlpools",
+    "logo": "/projects/orca.png",
     "title": "Orca Whirlpools",
     "owner": "Orca",
     "kind": "protocol",
@@ -91,6 +100,7 @@
   },
   {
     "id": "raydium-cp-swap",
+    "logo": "/projects/raydium.png",
     "title": "Raydium CP Swap",
     "owner": "Raydium",
     "kind": "protocol",

@@ -113,6 +113,17 @@ test("directory shows real external bounties and one separate runnable fixture",
   await expect(page.locator(".directory-row")).toHaveCount(19);
   await expect(page.locator(".directory-bounty")).toHaveCount(8);
   await expect(page.locator(".directory-source")).toHaveCount(10);
+  await expect(page.locator(".directory-bounty img.directory-project-logo")).toHaveCount(8);
+  await expect(page.locator(".directory-source img.directory-project-logo")).toHaveCount(10);
+  const firstBountyLogo = page.locator(".directory-bounty img.directory-project-logo").first();
+  await firstBountyLogo.scrollIntoViewIfNeeded();
+  await expect.poll(() => firstBountyLogo.evaluate(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)).toBe(true);
+  const firstSourceLogo = page.locator(".directory-source img.directory-project-logo").first();
+  await firstSourceLogo.scrollIntoViewIfNeeded();
+  await expect.poll(() => firstSourceLogo.evaluate(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)).toBe(true);
+  const soladyLogo = page.locator(".directory-source").filter({ hasText: "Solady" }).locator("img.directory-project-logo");
+  await soladyLogo.scrollIntoViewIfNeeded();
+  await expect.poll(() => soladyLogo.evaluate(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0)).toBe(true);
   await expect(page.getByText("Showing 19 entries")).toBeVisible();
   await expect(page.locator(".directory-source").first()).toBeVisible();
   await expect(page.getByText(/External programs are hosted by their owners on Immunefi/)).toBeVisible();
@@ -126,6 +137,7 @@ test("directory shows real external bounties and one separate runnable fixture",
   await expect(page.locator(".directory-bounty").filter({ hasText: "Solana" })).not.toHaveCount(0);
   await page.getByRole("link", { name: "View Raydium bounty summary" }).click();
   await expect(page).toHaveURL(/\/opportunities\/raydium$/);
+  await expect(page.locator(".opportunity-project-logo")).toHaveAttribute("src", /raydium\.png/);
   const join = page.getByRole("link", { name: "Join bounty" });
   await expect(join).toHaveAttribute("href", "/submit-report?bounty=raydium");
   await expect(page.getByText(/External bug bounty/)).toHaveCount(0);

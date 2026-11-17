@@ -1,9 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { extname } from "node:path";
 
 const sources = JSON.parse(readFileSync(new URL("./public/data/public-sources.json", import.meta.url), "utf8"));
 const bounties = JSON.parse(readFileSync(new URL("./public/data/bug-bounties.json", import.meta.url), "utf8"));
+
+function assertLocalLogo(item) {
+  assert.match(item.logo, /^\/projects\/[a-z0-9-]+\.(png|svg)$/);
+  const asset = readFileSync(new URL(`./public${item.logo}`, import.meta.url));
+  assert.ok(asset.length > 100, `${item.id} logo is empty`);
+  if (extname(item.logo) === ".png") assert.equal(asset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  else assert.match(asset.toString("utf8"), /<svg\b/);
+}
 
 test("eight external bounties carry official terms, scope and dated summaries", () => {
   assert.equal(bounties.length, 8);
@@ -11,6 +20,7 @@ test("eight external bounties carry official terms, scope and dated summaries", 
   assert.ok(bounties.filter(item => item.ecosystems.includes("solana")).length >= 2);
   assert.ok(bounties.filter(item => item.ecosystems.includes("ethereum")).length >= 2);
   for (const item of bounties) {
+    assertLocalLogo(item);
     assert.match(item.programUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/information\/$/);
     assert.match(item.scopeUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/scope\/$/);
     assert.match(item.resourcesUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/resources\/$/);
@@ -31,6 +41,7 @@ test("catalog has ten distinct pinned GitHub source references across two ecosys
   assert.equal(sources.filter(source => source.ecosystem === "ethereum").length, 8);
   assert.equal(sources.filter(source => source.ecosystem === "solana").length, 2);
   for (const source of sources) {
+    assertLocalLogo(source);
     assert.match(source.repository, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
     assert.match(source.revision, /^[a-f0-9]{40}$/);
     assert.ok(["ethereum", "solana"].includes(source.ecosystem));
