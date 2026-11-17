@@ -15,7 +15,10 @@ test("eight external bounties carry official terms, scope and dated summaries", 
     assert.match(item.scopeUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/scope\/$/);
     assert.match(item.resourcesUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/resources\/$/);
     assert.match(item.checkedAt, /^\d{4}-\d{2}-\d{2}$/);
-    assert.ok(item.instructions.length && item.scope.length);
+    for (const section of ["instructions", "reporting", "restrictions", "targets", "impacts", "scope"]) {
+      assert.ok(Array.isArray(item[section]) && item[section].length > 0, `${item.id} needs ${section}`);
+      assert.ok(item[section].every(line => typeof line === "string" && line.trim()), `${item.id} has an empty ${section} entry`);
+    }
     assert.ok(item.auditsUrl === null || item.auditsUrl.startsWith("https://github.com/"));
   }
 });
