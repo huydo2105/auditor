@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, BookOpen, CheckCircle2, Code2, ExternalLink, Search } from "lucide-react";
+import { ArrowRight, CheckCircle2, ExternalLink, Search } from "lucide-react";
 import bounties from "@/public/data/bug-bounties.json";
 import publicSources from "@/public/data/public-sources.json";
 import { NetworkBadge } from "@/components/opportunities/network-badge";
@@ -19,7 +19,7 @@ function SourceRow({ source }: { source: Source }) {
   const practice = source.kind === "practice";
   const url = `https://github.com/${source.repository}/tree/${source.revision}`;
   return <a href={url} target="_blank" rel="noopener noreferrer" className="directory-row directory-source focus-ring" aria-label={`Open official source for ${source.title} on GitHub (new tab)`}>
-    <div className="directory-row-main"><span className="directory-mark directory-mark-muted" aria-hidden="true">{practice ? <BookOpen size={22} /> : <Code2 size={22} />}</span><div><strong>{source.title}</strong><small>{source.owner} · {source.description}</small></div><span className="directory-reward">View source<small>GitHub ↗</small></span></div>
+    <div className="directory-row-main"><span className="directory-mark directory-mark-muted" aria-hidden="true"><Image src={source.logo} width={40} height={40} alt="" className="directory-project-logo" /></span><div><strong>{source.title}</strong><small>{source.owner} · {source.description}</small></div><span className="directory-reward">View source<small>GitHub ↗</small></span></div>
     <div className="directory-row-foot"><span>{practice ? "Practice project" : "Public source"}</span><NetworkBadge ecosystem={source.ecosystem} /><span className="directory-revision">Pinned revision <code>{source.revision.slice(0, 12)}</code></span><span className="directory-date">Read-only reference <ExternalLink size={14} aria-hidden="true" /></span></div>
   </a>;
 }
@@ -54,7 +54,7 @@ export function OpportunityList() {
       <p className="directory-result-count" aria-live="polite">Showing {count} {count === 1 ? "entry" : "entries"}</p>
       <div className="directory-list" aria-live="polite">
         {visibleBounties.map(item => <Link key={item.id} href={`/opportunities/${item.id}`} className="directory-row directory-bounty focus-ring" aria-label={`View ${item.title} bounty summary`}>
-          <div className="directory-row-main"><span className="directory-mark directory-bounty-mark" aria-hidden="true">{item.title.slice(0, 1)}</span><div><strong>{item.title}</strong><small>{item.description}</small></div><span className="directory-reward">{item.maximumReward}<small>Published maximum</small></span></div>
+          <div className="directory-row-main"><span className="directory-mark directory-bounty-mark" aria-hidden="true"><Image src={item.logo} width={40} height={40} alt="" className="directory-project-logo" /></span><div><strong>{item.title}</strong><small>{item.description}</small></div><span className="directory-reward">{item.maximumReward}<small>Published maximum</small></span></div>
           <div className="directory-row-foot"><span>Bug bounty · Immunefi</span>{item.ecosystems.map(network => <NetworkBadge key={network} ecosystem={network} />)}<span>Read official terms before testing</span><span className="directory-date">View scope <ArrowRight size={16} aria-hidden="true" /></span></div>
         </Link>)}
         {visibleBounties.length > 0 && <TeamPromo />}

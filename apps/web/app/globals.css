@@ -450,6 +450,8 @@ summary { cursor: pointer; }
 .directory-bounty { transition: border-color .18s ease, background-color .18s ease; }
 .directory-bounty:hover { border-color: var(--accent); background: var(--accent-soft); }
 .directory-bounty-mark { background: #efe8e4; color: var(--accent); font-weight: 800; font-size: 1.1rem; }
+.directory-project-logo { display: block; width: 40px; height: 40px; max-width: 100%; object-fit: contain; border-radius: 50%; }
+.directory-mark:has(.directory-project-logo) { overflow: hidden; background: #fff; border: 1px solid var(--line); }
 .directory-network { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: var(--surface); white-space: nowrap; }
 .directory-network-solana svg { color: #6857b4; }
 .directory-network-ethereum svg { color: #6178ba; }
@@ -557,6 +559,8 @@ summary { cursor: pointer; }
 .opportunity-detail-header { padding: 40px 0 36px; border-bottom: 1px solid var(--line); }
 .opportunity-identity { display: flex; align-items: center; gap: 20px; }
 .opportunity-identity-mark { display: grid; place-items: center; width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 50%; color: var(--accent); font-size: 2rem; font-weight: 800; }
+.opportunity-identity-mark:has(.opportunity-project-logo) { overflow: hidden; background: #fff; }
+.opportunity-project-logo { display: block; width: 56px; height: 56px; max-width: 100%; object-fit: contain; border-radius: 50%; }
 .opportunity-detail h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.08; letter-spacing: -.05em; }
 .opportunity-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .opportunity-tags span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 99px; background: var(--surface); color: var(--muted); font-size: .75rem; }
