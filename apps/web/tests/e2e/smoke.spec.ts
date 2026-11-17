@@ -108,27 +108,30 @@ test("agent brief stays readable when clipboard permission is unavailable", asyn
   await expect(page.locator(".report-agent-brief")).toContainText("contracts/evm/FixtureVault.sol");
 });
 
-test("directory keeps public source references distinct from the runnable fixture", async ({ page }) => {
+test("directory shows real external bounties and one separate runnable fixture", async ({ page }) => {
   await page.goto("/get-started");
-  await expect(page.locator(".directory-row")).toHaveCount(11);
+  await expect(page.locator(".directory-row")).toHaveCount(19);
+  await expect(page.locator(".directory-bounty")).toHaveCount(8);
   await expect(page.locator(".directory-source")).toHaveCount(10);
-  await expect(page.getByText("Showing 11 entries")).toBeVisible();
+  await expect(page.getByText("Showing 19 entries")).toBeVisible();
   await expect(page.locator(".directory-source").first()).toBeVisible();
-  await expect(page.getByText("Public repositories are source references, not VeriPoC audit programs.")).toBeVisible();
+  await expect(page.getByText(/External programs are hosted by their owners on Immunefi/)).toBeVisible();
   const uniswap = page.getByRole("link", { name: /Open official source for Uniswap v4 Core/ });
   await expect(uniswap).toHaveAttribute("href", /^https:\/\/github\.com\/Uniswap\/v4-core\/tree\/[a-f0-9]{40}$/);
   await expect(uniswap).toHaveAttribute("rel", "noopener noreferrer");
-  await page.getByRole("group", { name: "Filter by ecosystem" }).getByRole("button", { name: /Solana/ }).click();
-  await expect(page.locator(".directory-source")).toHaveCount(2);
-  await expect(page.getByText("Showing 2 entries")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open official source for Orca Whirlpools/ })).toHaveAttribute("href", /^https:\/\/github\.com\/orca-so\/whirlpools\/tree\/[a-f0-9]{40}$/);
-  await expect(page.getByRole("link", { name: /Open official source for Raydium CP Swap/ })).toHaveAttribute("href", /^https:\/\/github\.com\/raydium-io\/raydium-cp-swap\/tree\/[a-f0-9]{40}$/);
-  await expect(page.getByRole("link", { name: "Open Demo Vault Audit Program details" })).toHaveCount(0);
-  await page.getByRole("group", { name: "Filter by ecosystem" }).getByRole("button", { name: /Ethereum \/ EVM/ }).click();
-  await expect(page.locator(".directory-source")).toHaveCount(8);
-  await expect(page.getByRole("link", { name: "Open Demo Vault Audit Program details" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Filter by ecosystem" })).toHaveCount(0);
+  await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Bug bounties/ }).click();
+  await expect(page.locator(".directory-bounty")).toHaveCount(8);
+  await expect(page.locator(".directory-source")).toHaveCount(0);
+  await expect(page.locator(".directory-bounty").filter({ hasText: "Solana" })).not.toHaveCount(0);
+  await page.getByRole("link", { name: "View Raydium bounty summary" }).click();
+  await expect(page).toHaveURL(/\/opportunities\/raydium$/);
+  await expect(page.getByRole("link", { name: /Open official bounty/ })).toHaveAttribute("href", "https://immunefi.com/bug-bounty/raydium/information/");
+  await expect(page.getByText(/not connected to VeriPoC/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Join bounty/ })).toHaveCount(0);
+  await page.getByRole("link", { name: "All opportunities" }).click();
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Public source/ }).click();
-  await expect(page.locator(".directory-source")).toHaveCount(6);
+  await expect(page.locator(".directory-source")).toHaveCount(8);
   await expect(page.getByRole("link", { name: "Open Demo Vault Audit Program details" })).toHaveCount(0);
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Practice labs/ }).click();
   await expect(page.locator(".directory-source")).toHaveCount(2);
@@ -137,8 +140,6 @@ test("directory keeps public source references distinct from the runnable fixtur
   await page.getByRole("searchbox", { name: "Search opportunities" }).fill("no such repository");
   await expect(page.getByRole("status")).toContainText("No matching entries");
   await page.getByRole("searchbox", { name: "Search opportunities" }).clear();
-  await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Bounties/ }).click();
-  await expect(page.getByRole("status")).toContainText("There are no live bounties");
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /All/ }).click();
   await page.getByRole("link", { name: "Open Demo Vault Audit Program details" }).click();
   await expect(page).toHaveURL(/\/opportunities\/demo-vault$/);
