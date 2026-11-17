@@ -55,7 +55,7 @@ export function ExternalReportDraft({ bounty }: { bounty: Bounty }) {
 
   return <main id="main" className="site-shell submit-report report-wizard external-report-draft">
     <Link href={`/opportunities/${bounty.id}`} className="back-link focus-ring"><ArrowLeft size={16} aria-hidden="true" /> {bounty.title} scope</Link>
-    <header className="report-wizard-hero"><p className="eyebrow">RESEARCHER WORKSPACE</p><h1>Turn a finding<br />into a report.</h1><p>Review {bounty.title}&apos;s current scope, investigate with your tools, and prepare a finding for the official program.</p></header>
+    <header className="report-wizard-hero"><h1>Turn a finding<br />into a report.</h1><p>Review {bounty.title}&apos;s current scope, investigate with your tools, and prepare a finding for the official program.</p></header>
     <div className="report-wizard-layout">
       <nav className="report-wizard-steps" aria-label="Finding preparation steps"><ol>{stages.map((stage, index) => { const Icon = stage.icon; return <li key={stage.title}><button type="button" className="focus-ring" aria-current={step === index ? "step" : undefined} disabled={index > furthest} onClick={() => goTo(index)}><span className="report-step-icon"><Icon size={18} aria-hidden="true" /></span><span><small>0{index + 1}</small>{stage.title}</span>{index < step && <Check size={15} aria-hidden="true" />}</button></li>; })}</ol></nav>
       <div className="report-wizard-content">
