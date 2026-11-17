@@ -3,6 +3,22 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const sources = JSON.parse(readFileSync(new URL("./public/data/public-sources.json", import.meta.url), "utf8"));
+const bounties = JSON.parse(readFileSync(new URL("./public/data/bug-bounties.json", import.meta.url), "utf8"));
+
+test("eight external bounties carry official terms, scope and dated summaries", () => {
+  assert.equal(bounties.length, 8);
+  assert.equal(new Set(bounties.map(item => item.id)).size, 8);
+  assert.ok(bounties.filter(item => item.ecosystems.includes("solana")).length >= 2);
+  assert.ok(bounties.filter(item => item.ecosystems.includes("ethereum")).length >= 2);
+  for (const item of bounties) {
+    assert.match(item.programUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/information\/$/);
+    assert.match(item.scopeUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/scope\/$/);
+    assert.match(item.resourcesUrl, /^https:\/\/immunefi\.com\/bug-bounty\/[a-z0-9]+\/resources\/$/);
+    assert.match(item.checkedAt, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(item.instructions.length && item.scope.length);
+    assert.ok(item.auditsUrl === null || item.auditsUrl.startsWith("https://github.com/"));
+  }
+});
 
 test("catalog has ten distinct pinned GitHub source references across two ecosystems", () => {
   assert.equal(sources.length, 10);
@@ -24,6 +40,21 @@ test("catalog cards never route external sources to VeriPoC submission or execut
   const component = readFileSync(new URL("./components/opportunities/opportunity-list.tsx", import.meta.url), "utf8");
   assert.match(component, /github\.com\/\$\{source\.repository\}\/tree\/\$\{source\.revision\}/);
   assert.match(component, /target="_blank" rel="noopener noreferrer"/);
-  assert.match(component, /Filter by ecosystem/);
+  assert.doesNotMatch(component, /Filter by ecosystem/);
+  assert.match(component, /Bug bounties/);
   assert.doesNotMatch(component, /fetch\(|type="file"|href="\/submit-report"|href="\/verify"/);
+});
+
+test("external bounty joins through a guarded local draft, not the vault verifier", () => {
+  const page = readFileSync(new URL("./app/opportunities/[slug]/page.tsx", import.meta.url), "utf8");
+  const tabs = readFileSync(new URL("./components/opportunities/external-bounty-tabs.tsx", import.meta.url), "utf8");
+  const route = readFileSync(new URL("./app/submit-report/page.tsx", import.meta.url), "utf8");
+  const draft = readFileSync(new URL("./components/journeys/external-report-draft.tsx", import.meta.url), "utf8");
+  assert.match(page, /Join bounty/);
+  assert.match(page, /submit-report\?bounty=\$\{bounty\.id\}/);
+  assert.doesNotMatch(page, /External bug bounty|Join bounty on Immunefi/);
+  assert.doesNotMatch(tabs, /Use your agent/);
+  assert.match(route, /if \(!bounty\) notFound\(\)/);
+  assert.match(draft, /Continue on Immunefi/);
+  assert.doesNotMatch(draft, /VerificationConsole|fetch\(|type="file"/);
 });

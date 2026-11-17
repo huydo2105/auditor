@@ -1,0 +1,50 @@
+[
+  {
+    "id": "aave", "title": "Aave", "ecosystems": ["ethereum"], "maximumReward": "$1,000,000", "description": "Lending protocol smart contracts and listed production assets.",
+    "instructions": ["Read the current Immunefi rules and eligible impacts before investigating.", "A reproducible PoC is required. Submit confidentially through Immunefi; payout requires the program's KYC process."],
+    "scope": ["Only assets and impacts listed on the current Aave scope page are eligible.", "The public Aave repositories are research references, not a substitute for the scope list."],
+    "programUrl": "https://immunefi.com/bug-bounty/aave/information/", "scopeUrl": "https://immunefi.com/bug-bounty/aave/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/aave/resources/", "auditsUrl": "https://github.com/aave-dao/aave-v3-origin/tree/main/audits", "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "lido", "title": "Lido", "ecosystems": ["ethereum"], "maximumReward": "$2,000,000", "description": "Ethereum liquid staking contracts and explicitly listed assets.",
+    "instructions": ["A PoC is required for every severity.", "Test on a local fork. The program prohibits testing deployed code on mainnet or public testnet."],
+    "scope": ["Use the official scope table to identify eligible contracts and impacts.", "Testnet-labeled contracts are excluded under the published resources."],
+    "programUrl": "https://immunefi.com/bug-bounty/lido/information/", "scopeUrl": "https://immunefi.com/bug-bounty/lido/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/lido/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "metric", "title": "Metric", "ecosystems": ["ethereum"], "maximumReward": "$500,000", "description": "Active-pool DEX contracts on Ethereum and BNB Chain.",
+    "instructions": ["The program requires a runnable PoC.", "Check previously disclosed known issues before reporting; disclosed issues may be ineligible."],
+    "scope": ["Published scope includes pool, periphery, oracle and price-provider contract groups.", "Confirm the exact assets and eligible impacts on Immunefi."],
+    "programUrl": "https://immunefi.com/bug-bounty/metric/information/", "scopeUrl": "https://immunefi.com/bug-bounty/metric/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/metric/resources/", "auditsUrl": "https://github.com/Metricxyz/Known_issues", "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "0x", "title": "0x", "ecosystems": ["ethereum", "solana"], "maximumReward": "$1,000,000", "description": "DEX aggregation across EVM chains and Solana.",
+    "instructions": ["A PoC is required and Immunefi triages submissions.", "Review chain-specific assets and the KYC requirement in the official terms."],
+    "scope": ["Only the assets and impacts listed in the official scope qualify.", "The program spans multiple chains; select the exact target before testing."],
+    "programUrl": "https://immunefi.com/bug-bounty/0x/information/", "scopeUrl": "https://immunefi.com/bug-bounty/0x/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/0x/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "orca", "title": "Orca", "ecosystems": ["solana"], "maximumReward": "$500,000", "description": "Solana AMM program assets, including listed Whirlpools targets.",
+    "instructions": ["A PoC demonstrating impact is required.", "Use the official resources and submit any finding privately through Immunefi."],
+    "scope": ["Check the named assets and impacts in the current Orca scope table.", "A public source repository alone does not make every program version in scope."],
+    "programUrl": "https://immunefi.com/bug-bounty/orca/information/", "scopeUrl": "https://immunefi.com/bug-bounty/orca/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/orca/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "raydium", "title": "Raydium", "ecosystems": ["solana"], "maximumReward": "$505,000", "description": "Solana AMM and concentrated-liquidity program assets.",
+    "instructions": ["A PoC is required under the published Immunefi rules.", "Public testnet addresses are reference only; the program prohibits testing on public testnets."],
+    "scope": ["Review the exact Raydium programs and functions in the current scope.", "OpenBook-related code that is not in use is excluded under the published rules."],
+    "programUrl": "https://immunefi.com/bug-bounty/raydium/information/", "scopeUrl": "https://immunefi.com/bug-bounty/raydium/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/raydium/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "marinade", "title": "Marinade", "ecosystems": ["solana"], "maximumReward": "$250,000", "description": "Solana liquid staking assets listed by Marinade.",
+    "instructions": ["Follow the current Immunefi rules and confidential submission flow.", "Read the eligible impacts and reward terms before preparing a report."],
+    "scope": ["The official scope page controls which Marinade assets are eligible.", "Do not infer program permission from public source code alone."],
+    "programUrl": "https://immunefi.com/bug-bounty/marinade/information/", "scopeUrl": "https://immunefi.com/bug-bounty/marinade/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/marinade/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "pythnetwork", "title": "Pyth Network", "ecosystems": ["solana", "ethereum"], "maximumReward": "$125,000", "description": "Oracle and cross-chain assets, including Solana and Ethereum targets.",
+    "instructions": ["A PoC is required; read the current privacy and KYC terms.", "The published rules prohibit testing on mainnet and public testnets."],
+    "scope": ["Pyth Crosschain Solana and Ethereum appear in the scope table, alongside other assets.", "Confirm the exact asset and impact before investigation."],
+    "programUrl": "https://immunefi.com/bug-bounty/pythnetwork/information/", "scopeUrl": "https://immunefi.com/bug-bounty/pythnetwork/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/pythnetwork/resources/", "auditsUrl": "https://github.com/pyth-network/audit-reports", "checkedAt": "2026-11-17"
+  }
+]
