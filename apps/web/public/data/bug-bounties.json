@@ -1,0 +1,82 @@
+[
+  {
+    "id": "aave", "logo": "/projects/aave.png", "title": "Aave", "ecosystems": ["ethereum"], "maximumReward": "$1,000,000", "description": "Lending protocol smart contracts and listed production assets.",
+    "instructions": ["Read the current Immunefi rules and eligible impacts before investigating.", "A reproducible PoC is required. Submit confidentially through Immunefi; payout requires the program's KYC process."],
+    "reporting": ["Show the affected Aave subsystem, network, contract and source revision, then demonstrate the claimed impact with a reproducible PoC.", "Check earlier Aave audit reports and fixes; a previously documented or mitigated root cause may be ineligible.", "For reward assessment, distinguish an actual loss path from an economic scenario that cannot realistically be executed."],
+    "restrictions": ["Run experiments on a local fork rather than deployed mainnet or public testnet code.", "Do not test third-party contracts or price oracles, generate disruptive traffic, or disclose an unpatched finding publicly.", "Follow Immunefi's responsible-publication and PoC rules; a reproduced test alone does not establish bounty eligibility."],
+    "targets": ["Aave v3 active pool infrastructure, including Pool, L2Pool, configurator, address provider, access manager, interest-rate strategy and relevant logic libraries.", "The official tables also list Aave v2, governance, treasury, safety-module and GHO subsystems with network-specific conditions.", "The official scope currently contains many individual entries; inspect each exact asset and address there before testing."],
+    "impacts": ["Fund loss, freezing, insolvency and other impacts are graded separately in the official table.", "Aave v2 impact eligibility depends on whether the deployment is on Ethereum or another network.", "The program has special terms for market-manipulation feasibility and the funds directly affected."],
+    "scope": ["Only assets and impacts listed on the current Aave scope page are eligible.", "The public Aave repositories are research references, not a substitute for the scope list."],
+    "programUrl": "https://immunefi.com/bug-bounty/aave/information/", "scopeUrl": "https://immunefi.com/bug-bounty/aave/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/aave/resources/", "auditsUrl": "https://github.com/aave-dao/aave-v3-origin/tree/main/audits", "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "lido", "logo": "/projects/lido.png", "title": "Lido", "ecosystems": ["ethereum"], "maximumReward": "$2,000,000", "description": "Ethereum liquid staking contracts and explicitly listed assets.",
+    "instructions": ["A PoC is required for every severity.", "Test on a local fork. The program prohibits testing deployed code on mainnet or public testnet."],
+    "reporting": ["Identify the affected Lido asset and deployed revision, explain the broken invariant and provide a runnable reproduction.", "Review the program's treatment of pausable contracts: its reward assessment considers the initial attack window.", "Check the current reward, disclosure and eligibility rules before submitting through Immunefi."],
+    "restrictions": ["Use a local testing environment; do not probe deployed mainnet or public testnet contracts.", "Do not treat testnet-labeled contracts or partner systems as automatically eligible.", "Keep any unpatched report confidential and follow the official responsible-disclosure terms."],
+    "targets": ["Lido lists multiple smart-contract assets and related service entries in its official scope table.", "The table includes a circuit-breaker entry and auxiliary services; their eligibility conditions differ from core contracts.", "Inspect the exact named contract and deployment in the live scope before running an agent."],
+    "impacts": ["The official table sets severity by the particular asset and demonstrated consequence.", "For a pausable vulnerable contract, reward assessment considers the first hour of potential impact.", "Auxiliary services have a narrower eligible impact than the core smart-contract assets."],
+    "scope": ["Use the official scope table to identify eligible contracts and impacts.", "Testnet-labeled contracts are excluded under the published resources."],
+    "programUrl": "https://immunefi.com/bug-bounty/lido/information/", "scopeUrl": "https://immunefi.com/bug-bounty/lido/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/lido/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "metric", "logo": "/projects/metric.png", "title": "Metric", "ecosystems": ["ethereum"], "maximumReward": "$500,000", "description": "Active-pool DEX contracts on Ethereum and BNB Chain.",
+    "instructions": ["The program requires a runnable PoC.", "Check previously disclosed known issues before reporting; disclosed issues may be ineligible."],
+    "reporting": ["Name the specific Metric pool, periphery, oracle or price-provider component and show a runnable local PoC.", "Explain how the observed behavior violates an intended cap, timelock, price-band or other protected invariant.", "Compare the claim with published known issues and prior audits before submission."],
+    "restrictions": ["Use permitted local tests; do not interfere with live pools or third-party infrastructure.", "Normal market risk, expected admin actions inside configured bounds, and known root causes are excluded under the published rules.", "Follow the current Immunefi disclosure and submission requirements."],
+    "targets": ["Pool Contracts", "Periphery Contracts that facilitate the protocol", "Oracle and Price Provider Contracts", "The official table also includes a Primacy of Impact entry; read its limits before relying on it."],
+    "impacts": ["The published table includes unauthorized price updates, fund loss, freezing and insolvency at its highest tier.", "It also describes bypasses of admin-fee caps or a price-provider timelock, and swaps outside configured bands or staleness limits.", "Compare the precise impact and threshold with the current table; a plausible bug alone is not enough."],
+    "scope": ["Published scope includes pool, periphery, oracle and price-provider contract groups.", "Confirm the exact assets and eligible impacts on Immunefi."],
+    "programUrl": "https://immunefi.com/bug-bounty/metric/information/", "scopeUrl": "https://immunefi.com/bug-bounty/metric/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/metric/resources/", "auditsUrl": "https://github.com/Metricxyz/Known_issues", "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "0x", "logo": "/projects/0x.png", "title": "0x", "ecosystems": ["ethereum", "solana"], "maximumReward": "$1,000,000", "description": "DEX aggregation across EVM chains and Solana.",
+    "instructions": ["A PoC is required and Immunefi triages submissions.", "Review chain-specific assets and the KYC requirement in the official terms."],
+    "reporting": ["Choose the specific 0x product and network before investigating; the bounty spans EVM services and Solana.", "Provide a reproducible impact trace and identify the affected component, input, revision and preconditions.", "Submit privately via Immunefi, which triages this program; confirm payout identity requirements in the current rules."],
+    "restrictions": ["Do not assume every 0x API, website or deployed contract is eligible merely because its source is public.", "Check whether testing an API or web surface is permitted before generating traffic.", "Keep unpublished findings confidential and follow the current program rules."],
+    "targets": ["0x Settler", "DEX Meta Aggregator", "swap API and gasless API", "Matcha website", "Primacy of Impact entry, subject to its published restrictions"],
+    "impacts": ["The official scope has separate smart-contract and service impacts, including fund theft and sensitive-data exposure.", "Severity and eligibility depend on the affected asset and the demonstrated effect.", "Use the live table for exact chain, asset and impact pairing."],
+    "scope": ["Only the assets and impacts listed in the official scope qualify.", "The program spans multiple chains; select the exact target before testing."],
+    "programUrl": "https://immunefi.com/bug-bounty/0x/information/", "scopeUrl": "https://immunefi.com/bug-bounty/0x/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/0x/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "orca", "logo": "/projects/orca.png", "title": "Orca", "ecosystems": ["solana"], "maximumReward": "$500,000", "description": "Solana AMM program assets, including listed Whirlpools targets.",
+    "instructions": ["A PoC demonstrating impact is required.", "Use the official resources and submit any finding privately through Immunefi."],
+    "reporting": ["Identify whether the issue affects Orca Whirlpools or xORCA and include the relevant Solana program or source revision.", "Describe the attack preconditions, account state, transaction sequence and measurable user or protocol impact.", "Prepare a reproducible Solana PoC under the current program rules, then report through Immunefi."],
+    "restrictions": ["Keep testing within the explicitly listed Solana assets; public source code does not expand the bounty.", "Avoid live-fund disruption and public disclosure of an unpatched finding.", "Read the official restrictions and PoC requirements before running automated tools."],
+    "targets": ["Orca Whirlpools", "xORCA"],
+    "impacts": ["The current table includes theft or permanent freezing of user funds at the highest tier.", "It also distinguishes temporary freezes, misassigned value, yield impacts and selected medium-level failures.", "Confirm the exact allowed impact for the chosen target in the live scope."],
+    "scope": ["Check the named assets and impacts in the current Orca scope table.", "A public source repository alone does not make every program version in scope."],
+    "programUrl": "https://immunefi.com/bug-bounty/orca/information/", "scopeUrl": "https://immunefi.com/bug-bounty/orca/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/orca/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "raydium", "logo": "/projects/raydium.png", "title": "Raydium", "ecosystems": ["solana"], "maximumReward": "$505,000", "description": "Solana AMM and concentrated-liquidity program assets.",
+    "instructions": ["A PoC is required under the published Immunefi rules.", "Public testnet addresses are reference only; the program prohibits testing on public testnets."],
+    "reporting": ["Name the exact Raydium program, instruction or function and its deployed version before investigating.", "Give a reproducible Solana transaction sequence and evidence of the resulting impact.", "Compare the claim with exclusions and submit privately through Immunefi."],
+    "restrictions": ["Do not test Raydium's deployed public testnet addresses; they are listed as references.", "OpenBook-related code that is not used by the current protocol is excluded.", "Use an isolated local environment and respect the official testing and disclosure rules."],
+    "targets": ["The official table lists individual Raydium instructions, including pool creation, liquidity changes, position closure and reward collection.", "It also lists administrative and fee-collection instructions under their own entries.", "These are examples, not the full instruction list; select the exact named function from the current scope table."],
+    "impacts": ["Review the official smart-contract impact table for the eligible loss, freezing or protocol-failure consequence.", "Match the demonstrated effect to the exact program instruction and severity before reporting."],
+    "scope": ["Review the exact Raydium programs and functions in the current scope.", "OpenBook-related code that is not in use is excluded under the published rules."],
+    "programUrl": "https://immunefi.com/bug-bounty/raydium/information/", "scopeUrl": "https://immunefi.com/bug-bounty/raydium/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/raydium/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "marinade", "logo": "/projects/marinade.png", "title": "Marinade", "ecosystems": ["solana"], "maximumReward": "$250,000", "description": "Solana liquid staking assets listed by Marinade.",
+    "instructions": ["Follow the current Immunefi rules and confidential submission flow.", "Read the eligible impacts and reward terms before preparing a report."],
+    "reporting": ["Identify the Marinade staking program and the affected Solana account or instruction.", "Provide a reproducible PoC and explain the asset movement or liveness failure it demonstrates.", "Submit the reviewed finding through Immunefi under the current program rules."],
+    "restrictions": ["The published scope lists one smart-contract asset; do not infer coverage for other Marinade repositories or products.", "Avoid testing with live user funds or disclosing unpatched findings.", "Confirm the current PoC and eligibility rules before using an agent."],
+    "targets": ["The official smart-contract scope lists one Marinade asset; its exact program target must be read from the live table."],
+    "impacts": ["The listed critical impacts include theft, permanent fund freezing and protocol insolvency.", "The high tier includes yield theft or freezing and certain temporary fund freezes.", "The live impact table determines exact eligibility and severity."],
+    "scope": ["The official scope page controls which Marinade assets are eligible.", "Do not infer program permission from public source code alone."],
+    "programUrl": "https://immunefi.com/bug-bounty/marinade/information/", "scopeUrl": "https://immunefi.com/bug-bounty/marinade/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/marinade/resources/", "auditsUrl": null, "checkedAt": "2026-11-17"
+  },
+  {
+    "id": "pythnetwork", "logo": "/projects/pythnetwork.png", "title": "Pyth Network", "ecosystems": ["solana", "ethereum"], "maximumReward": "$125,000", "description": "Oracle and cross-chain assets, including Solana and Ethereum targets.",
+    "instructions": ["A PoC is required; read the current privacy and KYC terms.", "The published rules prohibit testing on mainnet and public testnets."],
+    "reporting": ["Choose a specific Pyth service and chain, identify the affected revision and demonstrate the claimed oracle or cross-chain impact with a PoC.", "Review the program's KYC and responsible-publication conditions before submitting through Immunefi.", "Treat external agent output as a hypothesis until a human reviews the reproduction and scope."],
+    "restrictions": ["Do not test deployed mainnet or public testnet code under the published rules.", "Do not assume a Pyth service on one chain grants permission to test its counterpart on another.", "Keep unpublished reports private and follow the official PoC guidelines."],
+    "targets": ["Pyth Crosschain: Ethereum, Solana and Sui", "Pyth Governance and Pyth Entropy", "Pyth Staking", "Pyth Lazer entries for EVM, Sui and Cardano", "The official page also has a separate Web & App category; verify its assets and rules independently."],
+    "impacts": ["The official table separates eligible impacts by asset category and severity.", "Show the concrete effect of a bad price, unauthorized update, cross-chain failure or fund loss when that effect is listed for the chosen target.", "Use the current table rather than assuming every oracle deviation qualifies."],
+    "scope": ["Pyth Crosschain Solana and Ethereum appear in the scope table, alongside other assets.", "Confirm the exact asset and impact before investigation."],
+    "programUrl": "https://immunefi.com/bug-bounty/pythnetwork/information/", "scopeUrl": "https://immunefi.com/bug-bounty/pythnetwork/scope/", "resourcesUrl": "https://immunefi.com/bug-bounty/pythnetwork/resources/", "auditsUrl": "https://github.com/pyth-network/audit-reports", "checkedAt": "2026-11-17"
+  }
+]

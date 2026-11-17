@@ -70,7 +70,7 @@ export function ReportWizard() {
 
   return <main id="main" className="site-shell submit-report report-wizard">
     <Link href="/opportunities/demo-vault" className="back-link focus-ring"><ArrowLeft size={16} aria-hidden="true" /> Vault program</Link>
-    <header className="report-wizard-hero"><p className="eyebrow">RESEARCHER WORKSPACE</p><h1>Turn an agent finding<br />into evidence.</h1><p>Read the allowed scope, guide your own agent, prepare a finding, and test the reviewed PoC with VeriPoC.</p></header>
+    <header className="report-wizard-hero"><h1>Turn an agent finding<br />into evidence.</h1><p>Read the allowed scope, guide your own agent, prepare a finding, and test the reviewed PoC with VeriPoC.</p></header>
     <div className="report-wizard-layout">
       <nav className="report-wizard-steps" aria-label="Finding preparation steps"><ol>{stages.map((stage, index) => { const Icon = stage.icon; return <li key={stage.title}><button type="button" className="focus-ring" aria-current={step === index ? "step" : undefined} disabled={index > furthest} onClick={() => goTo(index)}><span className="report-step-icon"><Icon size={18} aria-hidden="true" /></span><span><small>0{index + 1}</small>{stage.title}</span>{index < step && <Check size={15} aria-hidden="true" />}</button></li>; })}</ol></nav>
       <div className="report-wizard-content">
