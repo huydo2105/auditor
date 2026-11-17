@@ -460,14 +460,11 @@ summary { cursor: pointer; }
 .external-bounty-panel { min-height: 320px; }
 .external-bounty-panel ol { padding-left: 22px; }
 .external-bounty-panel .site-action { margin-top: 22px; }
-.external-report-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 28px; align-items: start; margin-top: 30px; }
-.external-report-rules { padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.external-report-rules h2 { font-size: 1.1rem; }
-.external-report-rules ul { padding-left: 19px; margin: 15px 0; color: var(--muted); font-size: .85rem; line-height: 1.6; }
-.external-report-rules li + li { margin-top: 10px; }
-.external-report-rules .external-program-link { margin-top: 12px; }
-.external-report-draft .report-stage { min-width: 0; }
-@media (max-width: 760px) { .external-report-layout { grid-template-columns: 1fr; } }
+.external-bounty-panel h3 { padding-top: 20px; border-top: 1px solid var(--line); }
+.external-bounty-panel .external-bounty-source-note { max-width: 65ch; margin-bottom: 20px; }
+.external-bounty-panel .external-program-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 18px; font-weight: 650; }
+.external-bounty-panel li { max-width: 70ch; }
+.report-stage-links { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 20px; }
 .external-bounty-detail .opportunity-detail-aside dd { text-align: right; }
 .directory-content .demo-metrics { margin-bottom: 22px; }
 .directory-chain-filter { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 13px; }
