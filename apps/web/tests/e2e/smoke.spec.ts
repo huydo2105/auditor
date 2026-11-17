@@ -39,7 +39,7 @@ test("opportunity tabs show reviewed instructions and scope", async ({ page }) =
   await expect(page.getByText("Deployed contracts", { exact: true })).toBeVisible();
 });
 
-test("Join bounty opens only the supported local report flow", async ({ page }) => {
+test("reviewed vault opens only the supported local report flow", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
       writeText: async (value: string) => { sessionStorage.setItem("copied-agent-brief", value); },
@@ -47,7 +47,7 @@ test("Join bounty opens only the supported local report flow", async ({ page }) 
   });
   await page.goto("/opportunities/demo-vault");
   await expect(page.getByText("None offered")).toBeVisible();
-  await page.getByRole("link", { name: /Join bounty/ }).click();
+  await page.getByRole("link", { name: /Open verification workspace/ }).click();
   await expect(page).toHaveURL(/\/submit-report$/);
   await expect(page.getByRole("heading", { name: /Turn an agent finding.*into evidence/ })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Finding preparation steps" }).getByRole("button")).toHaveCount(4);
@@ -126,9 +126,20 @@ test("directory shows real external bounties and one separate runnable fixture",
   await expect(page.locator(".directory-bounty").filter({ hasText: "Solana" })).not.toHaveCount(0);
   await page.getByRole("link", { name: "View Raydium bounty summary" }).click();
   await expect(page).toHaveURL(/\/opportunities\/raydium$/);
-  await expect(page.getByRole("link", { name: /Open official bounty/ })).toHaveAttribute("href", "https://immunefi.com/bug-bounty/raydium/information/");
-  await expect(page.getByText(/not connected to VeriPoC/)).toBeVisible();
-  await expect(page.getByRole("link", { name: /Join bounty/ })).toHaveCount(0);
+  const join = page.getByRole("link", { name: /Join Raydium bounty on Immunefi/ });
+  await expect(join).toHaveAttribute("href", "https://immunefi.com/bug-bounty/raydium/information/");
+  await expect(join).toHaveAttribute("rel", "noopener noreferrer");
+  const bountyTabs = page.getByRole("tablist", { name: "Bounty information" });
+  await expect(bountyTabs.getByRole("tab", { name: "Instructions" })).toHaveAttribute("aria-selected", "true");
+  await bountyTabs.getByRole("tab", { name: "Scope" }).click();
+  await expect(page.getByRole("heading", { name: "Scope" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Inspect current scope/ })).toHaveAttribute("href", "https://immunefi.com/bug-bounty/raydium/scope/");
+  await bountyTabs.getByRole("tab", { name: "Scope" }).press("ArrowRight");
+  await expect(bountyTabs.getByRole("tab", { name: "Prior audits" })).toHaveAttribute("aria-selected", "true");
+  await bountyTabs.getByRole("tab", { name: "Use your agent" }).click();
+  await expect(page.getByRole("heading", { name: "Investigate with your own AI agent" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy agent brief" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open verification workspace/ })).toHaveCount(0);
   await page.getByRole("link", { name: "All opportunities" }).click();
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /Public source/ }).click();
   await expect(page.locator(".directory-source")).toHaveCount(8);
@@ -143,6 +154,24 @@ test("directory shows real external bounties and one separate runnable fixture",
   await page.getByRole("group", { name: "Opportunity category" }).getByRole("button", { name: /All/ }).click();
   await page.getByRole("link", { name: "Open Demo Vault Audit Program details" }).click();
   await expect(page).toHaveURL(/\/opportunities\/demo-vault$/);
+});
+
+test("external bounty brief copies public rules without starting a verifier job", async ({ page }) => {
+  const posts: string[] = [];
+  page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async (value: string) => { sessionStorage.setItem("external-agent-brief", value); },
+    } });
+  });
+  await page.goto("/opportunities/orca");
+  await page.getByRole("tab", { name: "Use your agent" }).click();
+  await page.getByRole("button", { name: "Copy agent brief" }).click();
+  await expect(page.getByRole("status")).toContainText("Research brief copied");
+  const copied = await page.evaluate(() => sessionStorage.getItem("external-agent-brief"));
+  expect(copied).toContain("https://immunefi.com/bug-bounty/orca/scope/");
+  expect(copied).toContain("The researcher submits through the official Immunefi program");
+  expect(posts).toEqual([]);
 });
 
 for (const width of [1440, 1024, 390, 320]) {
@@ -164,7 +193,7 @@ test("public scope remains readable without JavaScript", async ({ browser, baseU
     const page = await context.newPage();
     await page.goto("/opportunities/demo-vault");
     await expect(page.getByRole("heading", { name: "What we’re looking for" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Join bounty/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Open verification workspace/ })).toBeVisible();
   } finally { await context.close(); }
 });
 

@@ -455,7 +455,14 @@ summary { cursor: pointer; }
 .directory-network-ethereum svg { color: #6178ba; }
 .external-program-link { display: inline-flex; align-items: center; gap: 5px; margin: 16px 20px 0 0; color: var(--accent); font-weight: 700; text-decoration: none; }
 .external-program-link:hover { color: var(--ink); }
-.external-bounty-detail .opportunity-detail-nav a { padding: 20px 15px; }
+.external-bounty-tabs { overflow-x: auto; flex-wrap: nowrap; }
+.external-bounty-tabs button { flex: none; white-space: nowrap; }
+.external-bounty-panel { min-height: 320px; }
+.external-bounty-panel ol { padding-left: 22px; }
+.external-bounty-panel .site-action { margin-top: 22px; }
+.agent-brief-status { min-height: 1.5rem; margin-top: 10px; }
+.agent-brief-details { margin-top: 16px; }
+.agent-brief-details pre { overflow: auto; max-height: 400px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere; font-size: .78rem; line-height: 1.5; }
 .external-bounty-detail .opportunity-detail-aside dd { text-align: right; }
 .directory-content .demo-metrics { margin-bottom: 22px; }
 .directory-chain-filter { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 13px; }

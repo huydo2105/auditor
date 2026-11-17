@@ -44,3 +44,13 @@ test("catalog cards never route external sources to VeriPoC submission or execut
   assert.match(component, /Bug bounties/);
   assert.doesNotMatch(component, /fetch\(|type="file"|href="\/submit-report"|href="\/verify"/);
 });
+
+test("external bounty detail sends joining to Immunefi and keeps agent work client-owned", () => {
+  const page = readFileSync(new URL("./app/opportunities/[slug]/page.tsx", import.meta.url), "utf8");
+  const tabs = readFileSync(new URL("./components/opportunities/external-bounty-tabs.tsx", import.meta.url), "utf8");
+  assert.match(page, /Join bounty on Immunefi/);
+  assert.match(page, /href=\{bounty\.programUrl\}/);
+  assert.match(tabs, /Use your agent/);
+  assert.match(tabs, /navigator\.clipboard\.writeText/);
+  assert.doesNotMatch(page + tabs, /href="\/submit-report"|href="\/verify"|fetch\(|type="file"/);
+});
