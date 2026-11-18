@@ -7,6 +7,7 @@ import { ArrowRight, CheckCircle2, ExternalLink, Search } from "lucide-react";
 import bounties from "@/public/data/bug-bounties.json";
 import publicSources from "@/public/data/public-sources.json";
 import { NetworkBadge } from "@/components/opportunities/network-badge";
+import { BrandMark } from "@/components/brand/brand-mark";
 
 type Category = "all" | "bounties" | "source" | "practice" | "fixture";
 type Source = (typeof publicSources)[number];
@@ -59,7 +60,7 @@ export function OpportunityList() {
         </Link>)}
         {visibleBounties.length > 0 && <TeamPromo />}
         {showVault && <Link href="/opportunities/demo-vault" className="directory-row directory-live focus-ring" aria-label="Open Demo Vault Audit Program details">
-          <div className="directory-row-main"><span className="directory-mark"><Image src="/brand/veripoc-mark.svg" width={30} height={30} alt="" aria-hidden="true" /></span><div><strong>Demo Vault Audit Program</strong><small>VeriPoC reviewed synthetic fixture</small></div><span className="directory-reward">No bounty<small>Runnable locally</small></span></div>
+          <div className="directory-row-main"><span className="directory-mark"><BrandMark size={30} /></span><div><strong>Demo Vault Audit Program</strong><small>VeriPoC reviewed synthetic fixture</small></div><span className="directory-reward">No bounty<small>Runnable locally</small></span></div>
           <div className="directory-row-foot"><span>PoC verification</span><span className="directory-badge"><CheckCircle2 size={14} aria-hidden="true" /> Runnable fixture</span><NetworkBadge ecosystem="ethereum" /><span>ERC-4626-style vault</span><span className="directory-date">View fixture <ArrowRight size={16} aria-hidden="true" /></span></div>
         </Link>}
         {visibleSources.map(item => <SourceRow key={item.id} source={item} />)}
