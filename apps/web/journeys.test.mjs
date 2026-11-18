@@ -54,11 +54,12 @@ test("interactive source and displayed figures are limited to the local demo", (
   assert.doesNotMatch(metrics, /Researchers registered|Total paid out|Customers/);
 });
 
-test("vault detail shows honest fixture data and sends submissions to the shared verifier", () => {
+test("vault detail links to the protected program while preserving the fixed verifier", () => {
   assert.match(read("./app/opportunities/demo-vault/page.tsx"), /<RoleJourney \/>/);
   const journey = read("./components/journeys/role-journey.tsx");
   assert.match(journey, /role="tablist"/);
-  assert.match(journey, /href="\/submit-report"/);
+  assert.match(journey, /href="\/programs\/demo-vault"/);
+  assert.match(read("./app/programs/demo-vault/page.tsx"), /<ProgramWorkspace \/>/);
   assert.match(journey, /Runnable fixture/);
   assert.match(read("./app/submit-report/page.tsx"), /<ReportWizard \/>/);
   assert.match(read("./app/how-it-works/page.tsx"), /researcher-owned|your own AI agent/);

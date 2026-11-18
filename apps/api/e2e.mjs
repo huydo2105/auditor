@@ -1,22 +1,30 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createApiServer } from "./server.mjs";
+import { DEMO_PROGRAM } from "./program.mjs";
 
 const token = randomBytes(32).toString("hex");
-const server = createApiServer({ token });
+const teamToken = randomBytes(32).toString("hex");
+const researcherToken = randomBytes(32).toString("hex");
+const server = createApiServer({ token, teamToken, researcherToken });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 try {
+  const claimResponse = await fetch(`${base}/v1/programs/demo-vault/submissions`, { method: "POST", headers: {
+    Authorization: `Bearer ${researcherToken}`, "Content-Type": "application/json", "Idempotency-Key": randomUUID() },
+    body: JSON.stringify({ claim: "donation-share-inflation", targetSha256: DEMO_PROGRAM.targetSha256 }) });
+  assert.equal(claimResponse.status, 201);
+  const claim = await claimResponse.json();
   for (const fixture of ["vulnerable", "patched"]) {
-    const accepted = await fetch(`${base}/v1/verify-poc`, { method: "POST", headers: {
-      Authorization: `Bearer ${token}`, "Content-Type": "application/json", "Idempotency-Key": randomUUID() },
+    const accepted = await fetch(`${base}/v1/programs/demo-vault/submissions/${claim.id}/jobs`, { method: "POST", headers: {
+      Authorization: `Bearer ${researcherToken}`, "Content-Type": "application/json", "Idempotency-Key": randomUUID() },
       body: JSON.stringify({ artifactFormat: "repo-fixture-v1", fixture }) });
     assert.equal(accepted.status, 202);
     const { id } = await accepted.json();
     let job;
     for (let attempt = 0; attempt < 60; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 500));
-      const response = await fetch(`${base}/v1/jobs/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await fetch(`${base}/v1/programs/demo-vault/jobs/${id}`, { headers: { Authorization: `Bearer ${teamToken}` } });
       job = await response.json();
       if (job.state === "finished") break;
     }
@@ -31,6 +39,7 @@ try {
       assert.ok(BigInt(job.result.financialEvidence.victimShares) > 0n);
     }
     assert.equal(job.result.receipt?.fixture, fixture);
+    assert.equal(job.result.receipt.input.sourceSha256, DEMO_PROGRAM.workerInputSha256);
     const executionEvidence = JSON.stringify({ status: job.result.status, exitCode: job.result.exitCode,
       stdout: job.result.output, stderr: job.result.errorOutput });
     assert.equal(job.result.receipt.evidence.executionLogSha256,

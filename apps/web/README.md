@@ -1,10 +1,12 @@
 # VeriPoC web app
 
-The homepage explains Authorize, Investigate, and Verify in three scroll sections and shows local fixture numbers. The navbar links to a dedicated `/leaderboard` page backed by `public/data/agent-leaderboard.json`. Its profiles have zero verified findings and are illustrative, not actual users or rankings. `/how-it-works` explains the researcher workflow from the vault instructions. `/opportunities/demo-vault` reads the reviewed fixture program details from `public/data/vault-program.json` and provides Instructions and Scope tabs. Its Join bounty link opens `/submit-report`, where the existing authenticated verifier runs only the supported local fixtures. The vault offers no actual bounty reward or enrollment. The direct `/verify` route remains available.
+The homepage explains Authorize, Investigate, and Verify in three scroll sections and shows local fixture numbers. The navbar links to a dedicated `/leaderboard` page backed by `public/data/agent-leaderboard.json`. Its profiles have zero verified findings and are illustrative, not actual users or rankings. `/how-it-works` explains the researcher workflow from the vault instructions. `/opportunities/demo-vault` shows public fixture details and links to the authorized program workspace. The vault offers no bounty reward. The direct `/verify` operator route remains available.
 
 The App Router also serves `/get-started` and the unsaved team preview at `/teams/new`; `/workflow` redirects to Get started. The old `/teams/start` and `/researchers/start` pages were removed. The opportunity directory has one row of category filters and shows eight published Immunefi bug bounties, ten read-only public source references from `public/data/public-sources.json`, and one runnable local EVM vault fixture. Bounty detail pages provide Instructions, Scope, and Prior audits tabs. Their Join bounty actions open `/submit-report?bounty=<id>` in the same four-step researcher wizard layout as the vault: review scope, brief an agent, draft the finding, and review for official submission. This draft stays in browser memory. It does not create membership, send a private report, or run an external PoC. Unknown bounty IDs return 404 and never fall back to the local verifier. Source links point to official GitHub repositories at pinned commits. Neither bounty nor source cards can submit to the VeriPoC verifier. The team draft does not create or publish a program. Future support for authorized external targets and untrusted agent-generated PoCs is tracked separately in Issue #43.
 
 The site has Paper and Charcoal themes. The switch stores only a display preference in local storage; tokens, evidence, and project drafts are never saved there. Opportunity filters and program tabs do not execute Foundry. The verifier remains the Client Component that performs actual authenticated job submission and polling.
+
+The public vault detail links to `/programs/demo-vault`, a protected local workspace. Enter the team or invited researcher token configured on the API server. The API returns the role, scope, and private submissions; the invited researcher can submit the reviewed claim and run vulnerable and patched fixture jobs. The team can inspect those jobs and their private receipts. The page keeps the token and evidence in memory only. The existing `/verify` operator console and `/submit-report` unsent draft remain for compatibility. There is no full inbox, triage decision, external bounty intake, production account, or signed agent access.
 
 ## Local setup
 
@@ -15,7 +17,7 @@ npm ci
 npm run web:dev
 ```
 
-Open `http://127.0.0.1:3000`. The public pages work without the API. The `bug-bounties.json` catalog is a manually checked snapshot, not a live API feed; recheck status and rules before using it. The Next server proxies only `POST /v1/verify-poc` and `GET /v1/jobs/:id` to `VERIPOC_API_ORIGIN` (default `http://127.0.0.1:8787` in development). Start the API separately for a real verification:
+Open `http://127.0.0.1:3000`. The public pages work without the API. The `bug-bounties.json` catalog is a manually checked snapshot, not a live API feed; recheck status and rules before using it. The Next server proxies the fixed-fixture routes and the explicit `/v1/programs/demo-vault` scope, submission, and job routes to `VERIPOC_API_ORIGIN` (default `http://127.0.0.1:8787` in development). Start the API separately for a real verification:
 
 ```powershell
 $tokenBytes = New-Object byte[] 32
@@ -32,7 +34,7 @@ Build the trusted Docker image first if you want the vulnerable/patched Foundry 
 docker build -f infrastructure/docker/foundry-worker.Dockerfile -t veripoc-foundry-worker:issue-5 .
 ```
 
-Enter the token in `/verify`. It stays in page memory and is lost on reload. The browser sends it to the same-origin proxy, which forwards it to the API; the token is never bundled into client JavaScript, saved to browser storage, or put into a URL. The proxy allows only the two verification endpoints. The API still enforces its bearer token, idempotency, fixed-fixture validation, rate limits, and job limits. The UI does not grant team/researcher permissions; the program cards and draft are illustrative while scoped permissions are pending in Issue #35.
+Enter the operator token in `/verify`, or a program role token in `/programs/demo-vault`. It stays in page memory and is lost on reload. The browser sends it to the same-origin proxy, which forwards it to the API; the token is never bundled into client JavaScript, saved to browser storage, or put into a URL. The proxy allows only explicit routes. The API enforces its bearer tokens, membership, idempotency, fixture validation, rate limits, and job limits. Public program cards and the unsent draft grant no access.
 
 For a deployment with a separate backend, configure `VERIPOC_API_ORIGIN` as a **server-only HTTPS origin**. Production builds reject HTTP, credentials, paths, queries, and fragments. The current API binds only to loopback, so a remote deployment additionally needs a secured, private API hosting arrangement; this issue does not create one. Do not expose the Docker-capable Node process directly to the internet. The Next server does not run Foundry or Docker.
 

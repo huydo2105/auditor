@@ -25,6 +25,18 @@ for (const width of [1440, 1024, 390, 320]) {
   });
 }
 
+test("authorized workspace requires a token and fits mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/programs/demo-vault");
+  await expect(page.getByRole("heading", { name: "Demo Vault Audit Program" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open authorized program" })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.getByLabel("Local program token").fill("invalid-token");
+  await page.getByRole("button", { name: "Open authorized program" }).click();
+  await expect(page.getByRole("status")).toContainText("verification API is unavailable");
+  await expect(page.getByText("Private submissions")).toHaveCount(0);
+});
+
 test("opportunity tabs show reviewed instructions and scope", async ({ page }) => {
   await page.goto("/opportunities/demo-vault");
   const tabs = page.getByRole("tablist", { name: "Program information" });
@@ -47,8 +59,11 @@ test("reviewed vault opens only the supported local report flow", async ({ page 
   });
   await page.goto("/opportunities/demo-vault");
   await expect(page.getByText("None offered")).toBeVisible();
-  await page.getByRole("link", { name: "Join bounty" }).click();
-  await expect(page).toHaveURL(/\/submit-report$/);
+  await page.getByRole("link", { name: "Enter authorized program" }).click();
+  await expect(page).toHaveURL(/\/programs\/demo-vault$/);
+  await expect(page.getByLabel("Local program token")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open authorized program" })).toBeDisabled();
+  await page.goto("/submit-report");
   await expect(page.getByRole("heading", { name: /Turn an agent finding.*into evidence/ })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Finding preparation steps" }).getByRole("button")).toHaveCount(4);
   await page.getByRole("button", { name: "Continue to agent brief" }).click();
@@ -231,7 +246,7 @@ test("public scope remains readable without JavaScript", async ({ browser, baseU
     const page = await context.newPage();
     await page.goto("/opportunities/demo-vault");
     await expect(page.getByRole("heading", { name: "What we’re looking for" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Join bounty" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Enter authorized program" })).toBeVisible();
   } finally { await context.close(); }
 });
 
