@@ -1,4 +1,6 @@
 # VeriPoC UI Design System — Minimal, Evidence-First
+
+**Current visual implementation (Issue #39 onward):** the website uses a warm-white/charcoal palette with terracotta accent and a Paper/Charcoal theme toggle. The forest-green tokens below record the earlier design decision; use the live tokens in `apps/web/app/globals.css` and the [current brand mark guide](BRAND_MARK.md) for new visual work.
 **Decision:** 2026-11-11 | **Stage:** Minimalist brand and UI specification, updated for owner-requested Next.js/Tailwind migration and interactive education.
 **Brand mark created in PR #37:** SVG assets `apps/web/logo.svg` and `apps/web/app-icon.svg` replace the text-only header treatment; PR awaits review. Standard Next.js/Tailwind migration is explicitly requested and tracked in Issue #38; interactive scroll storytelling in Issue #39.
 

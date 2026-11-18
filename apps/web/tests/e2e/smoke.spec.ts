@@ -1,5 +1,33 @@
 import { expect, test } from "@playwright/test";
 
+test("brand mark keeps its accessible home link and adapts to both themes", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const brand = page.locator("header").getByRole("link", { name: "VeriPoC home" });
+  await expect(brand).toBeVisible();
+  await expect(brand.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  const box = await brand.boundingBox();
+  expect(box?.width).toBeGreaterThanOrEqual(44);
+  expect(box?.height).toBeGreaterThanOrEqual(44);
+
+  await page.getByRole("button", { name: "Paper" }).click();
+  await expect.poll(() => page.locator("body").evaluate(body => getComputedStyle(body).backgroundColor)).toBe("rgb(246, 245, 242)");
+  const lightStroke = await brand.locator("path").first().evaluate(path => getComputedStyle(path).stroke);
+  await page.screenshot({ path: testInfo.outputPath("brand-light-1440.png"), fullPage: false });
+  await page.getByRole("button", { name: "Charcoal" }).click();
+  await expect.poll(() => page.locator("body").evaluate(body => getComputedStyle(body).backgroundColor)).toBe("rgb(20, 20, 20)");
+  const darkStroke = await brand.locator("path").first().evaluate(path => getComputedStyle(path).stroke);
+  expect(lightStroke).not.toBe(darkStroke);
+  await page.screenshot({ path: testInfo.outputPath("brand-dark-1440.png"), fullPage: false });
+  await brand.focus();
+  await expect(brand).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("brand-dark-390.png"), fullPage: false });
+  const favicon = await page.request.get("/brand/veripoc-app-icon.svg");
+  expect(favicon.ok()).toBe(true);
+  expect(await favicon.text()).toContain("#ee9077");
+});
+
 for (const width of [1440, 1024, 390, 320]) {
   test(`workflow, leaderboard, and vault detail fit ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
