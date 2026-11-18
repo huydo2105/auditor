@@ -95,8 +95,15 @@ test("reviewed source excerpts and light/dark themes remain separate from live e
 
 test("logo is icon-only and published Agent Card remains byte-identical", () => {
   const logo = read("./components/brand/logo.tsx");
+  const mark = read("./components/brand/brand-mark.tsx");
+  const icon = read("./public/brand/veripoc-app-icon.svg");
   assert.match(logo, /aria-label="VeriPoC home"/);
-  assert.match(logo, /veripoc-mark.svg/);
+  assert.match(logo, /<BrandMark/);
   assert.doesNotMatch(logo, />VeriPoC</);
+  assert.match(mark, /var\(--ink\)/);
+  assert.match(mark, /var\(--accent\)/);
+  assert.match(icon, /#181716/);
+  assert.match(icon, /#ee9077/);
+  assert.equal(icon, read("./app/icon.svg"));
   assert.equal(read("./public/.well-known/agent-card.json"), read("../../.well-known/agent-card.json"));
 });
