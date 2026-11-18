@@ -71,7 +71,15 @@ export function receiptDigest(result) {
 
 export function apiError(status, message) {
   if (status === 401) return "API token rejected. Check the token and retry.";
-  if (status === 429) return "Local rate limit reached. Wait a minute before retrying.";
-  if (status === 503) return "The local job capacity is full. Review results and restart the API when ready.";
+  if (status === 429) {
+    return message === "program run limit reached"
+      ? "Program run limit reached (4 runs per server session)."
+      : "Local rate limit reached. Wait a minute before retrying.";
+  }
+  if (status === 503) {
+    return !message || message.startsWith("job capacity reached")
+      ? "The local job capacity is full. Review results and restart the API when ready."
+      : message;
+  }
   return typeof message === "string" && message ? message : `API request failed (HTTP ${status}).`;
 }

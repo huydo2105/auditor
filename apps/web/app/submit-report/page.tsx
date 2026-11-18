@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Prepare a finding" };
 
 export default async function SubmitReportPage({ searchParams }: { searchParams: Promise<{ bounty?: string | string[] }> }) {
   const { bounty: slug } = await searchParams;
-  if (slug === undefined) return <ReportWizard />;
+  if (slug === undefined || slug === "demo-vault") return <ReportWizard />;
   const bounty = typeof slug === "string" ? bounties.find(item => item.id === slug) : undefined;
   if (!bounty) notFound();
   return <ExternalReportDraft bounty={bounty} />;

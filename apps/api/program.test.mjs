@@ -100,3 +100,33 @@ test("a successful worker verdict with a different image input hash is rejected"
     assert.equal(job.data.result.receipt, undefined);
   }, { execute: async () => ({ status: "reproduced", receipt: { input: { sourceSha256: "0".repeat(64) } } }) });
 });
+
+test("external bounty scopes, arbitrary PoCs, and cross-scope job reads fail closed", async () => {
+  await withServer(async base => {
+    const legacy = await api(base, "/v1/verify-poc", token, runBody("vulnerable"));
+    assert.equal(legacy.status, 202);
+    assert.equal((await api(base, `${root}/jobs/${legacy.data.id}`, teamToken)).status, 404);
+    assert.equal((await api(base, `${root}/jobs/${legacy.data.id}`, researcherToken)).status, 404);
+
+    for (const slug of ["aave", "orca", "raydium"]) {
+      assert.equal((await api(base, `/v1/programs/${slug}`, researcherToken)).status, 404);
+      assert.equal((await api(base, `/v1/programs/${slug}/submissions`, researcherToken, claimBody)).status, 404);
+    }
+    assert.equal((await api(base, `${root}/submissions`, researcherToken, { claim: "aave", targetSha256: DEMO_PROGRAM.targetSha256 })).status, 400);
+    assert.equal((await api(base, `${root}/submissions`, researcherToken, { ...claimBody, poc: "contract Exploit {}" })).status, 400);
+
+    const claim = await api(base, `${root}/submissions`, researcherToken, claimBody);
+    const programJob = await api(base, `${root}/submissions/${claim.data.id}/jobs`, researcherToken, runBody("vulnerable"));
+    assert.equal(programJob.status, 202);
+    assert.equal((await api(base, `/v1/jobs/${programJob.data.id}`, token)).status, 404);
+    assert.equal((await api(base, `${root}/jobs/${programJob.data.id}`, token)).status, 401);
+    assert.equal((await api(base, `${root}/jobs/${programJob.data.id}`, teamToken)).status, 200);
+    assert.equal((await api(base, `${root}/jobs/${programJob.data.id}`, researcherToken)).status, 200);
+  });
+
+  await withServer(async base => {
+    assert.equal((await api(base, `${root}/submissions`, researcherToken)).status, 403);
+    assert.equal((await api(base, `${root}/jobs/${randomUUID()}`, researcherToken)).status, 403);
+    assert.equal((await api(base, `${root}/submissions`, researcherToken, claimBody)).status, 403);
+  }, { invitedResearcherIds: [] });
+});

@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { createApiServer } from "../../../api/server.mjs";
+import { DEMO_PROGRAM } from "../../../api/program.mjs";
 
 test("brand mark keeps its accessible home link and adapts to both themes", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -53,15 +55,21 @@ for (const width of [1440, 1024, 390, 320]) {
   });
 }
 
-test("authorized workspace requires a token and fits mobile", async ({ page }) => {
+test("authorized workspace uses the 4-step layout, requires a token, and fits mobile", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto("/programs/demo-vault");
-  await expect(page.getByRole("heading", { name: "Demo Vault Audit Program" })).toBeVisible();
+  await expect(page.getByText("DEMO VAULT AUDIT PROGRAM", { exact: false })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Finding preparation steps" }).getByRole("button")).toHaveCount(4);
+  await expect(page.getByRole("heading", { name: "Know what you may investigate." })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.getByRole("button", { name: /Verify evidence/ }).click();
+  await expect(page.getByTestId("finding-status")).toContainText("Draft only — not yet submitted");
   await expect(page.getByRole("button", { name: "Open authorized program" })).toBeDisabled();
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-  await page.getByLabel("Local program token").fill("invalid-token");
+  await page.getByLabel("LOCAL PROGRAM TOKEN").fill("invalid-token");
   await page.getByRole("button", { name: "Open authorized program" }).click();
-  await expect(page.getByRole("status")).toContainText("verification API is unavailable");
+  await expect(page.getByTestId("program-error")).toContainText("verification API is unavailable", { timeout: 20000 });
+  await expect(page.locator("#verification").getByRole("alert")).toContainText("verification API is unavailable");
   await expect(page.getByText("Private submissions")).toHaveCount(0);
 });
 
@@ -89,7 +97,9 @@ test("reviewed vault opens only the supported local report flow", async ({ page 
   await expect(page.getByText("None offered")).toBeVisible();
   await page.getByRole("link", { name: "Enter authorized program" }).click();
   await expect(page).toHaveURL(/\/programs\/demo-vault$/);
-  await expect(page.getByLabel("Local program token")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Finding preparation steps" }).getByRole("button")).toHaveCount(4);
+  await page.getByRole("button", { name: "Open protected program view" }).click();
+  await expect(page.getByLabel("LOCAL PROGRAM TOKEN")).toBeVisible();
   await expect(page.getByRole("button", { name: "Open authorized program" })).toBeDisabled();
   await page.goto("/submit-report");
   await expect(page.getByRole("heading", { name: /Turn an agent finding.*into evidence/ })).toBeVisible();
@@ -109,7 +119,7 @@ test("reviewed vault opens only the supported local report flow", async ({ page 
   await expect(page.locator("#verification").getByText("Awaiting run", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Verify PoC/ }).click();
   await expect(page.locator("#verification").getByRole("alert")).toContainText("Enter the local API token");
-  await page.getByLabel("LOCAL API TOKEN").fill("invalid-test-token");
+  await page.getByLabel("LOCAL PROGRAM TOKEN").fill("invalid-test-token");
   await page.getByRole("button", { name: /Verify PoC/ }).click();
   await expect(page.locator("#verification").getByRole("alert")).toContainText(/verification API is unavailable|API token rejected/i, { timeout: 20000 });
   await expect(page.locator("#verification").getByText("Awaiting run", { exact: true })).toBeVisible();
@@ -299,4 +309,166 @@ test("team draft wizard keeps fields locally and never submits a program", async
   expect(posts).toEqual([]);
   await page.reload();
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).not.toContainText("Sample vault review");
+});
+
+test("legacy /verify operator console remains available", async ({ page }) => {
+  await page.goto("/verify");
+  await expect(page.getByRole("heading", { name: /Verify a.*PoC/ })).toBeVisible();
+  await expect(page.getByLabel("LOCAL API TOKEN")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Verify PoC", exact: true })).toBeVisible();
+});
+
+test("Demo Vault wizard runs invited researcher verification and shows private evidence to team", async ({ browser, baseURL }) => {
+  const operatorToken = "operator-token-with-at-least-thirty-two-characters";
+  const teamToken = "team-token-with-at-least-thirty-two-characters";
+  const researcherToken = "researcher-token-with-at-least-thirty-two-characters";
+  const vulnDigest = "1".repeat(64);
+  const patchedDigest = "2".repeat(64);
+
+  const serverOptions = {
+    token: operatorToken,
+    teamToken,
+    researcherToken,
+    execute: async (_kind: string, body: { fixture: "vulnerable" | "patched" }) => {
+      const vulnerable = body.fixture === "vulnerable";
+      return {
+        status: vulnerable ? "reproduced" : "not_reproduced",
+        financialEvidence: vulnerable
+          ? { attackerBefore: "101", attackerAfter: "201", victimShares: "0" }
+          : { attackerBefore: "101", attackerAfter: "51", victimShares: "1960784" },
+        receipt: {
+          fixture: body.fixture,
+          invariant: {
+            passed: true,
+            name: vulnerable ? "testVulnerableDonationReproduces" : "testPatchedDonationDoesNotReproduce",
+          },
+          input: { imageId: "sha256:local-test", sourceSha256: DEMO_PROGRAM.workerInputSha256 },
+          tools: { forge: "1.0.0", solc: "0.8.28" },
+          evidence: { executionLogSha256: vulnerable ? "a".repeat(64) : "b".repeat(64) },
+        },
+        anchor: { receiptSha256: vulnerable ? vulnDigest : patchedDigest },
+      };
+    },
+  };
+  const server = createApiServer(serverOptions);
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const apiBase = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+
+  async function forwardProgramApi(targetPage: import("@playwright/test").Page) {
+    await targetPage.route("**/v1/**", async route => {
+      const req = route.request();
+      const url = new URL(req.url());
+      const headers: Record<string, string> = {};
+      for (const name of ["authorization", "content-type", "idempotency-key"]) {
+        const value = req.headers()[name];
+        if (value) headers[name] = value;
+      }
+      const upstream = await fetch(`${apiBase}${url.pathname}${url.search}`, {
+        method: req.method(),
+        headers,
+        body: req.method() === "POST" ? (req.postData() ?? "") : undefined,
+      });
+      await route.fulfill({
+        status: upstream.status,
+        contentType: upstream.headers.get("content-type") ?? "application/json",
+        body: await upstream.text(),
+      });
+    });
+  }
+
+  try {
+    const researcherContext = await browser.newContext({ baseURL });
+    try {
+      const page = await researcherContext.newPage();
+      await forwardProgramApi(page);
+
+      await page.goto("/submit-report?bounty=demo-vault");
+      await expect(page.getByRole("heading", { name: "Know what you may investigate." })).toBeVisible();
+      await page.getByRole("button", { name: "Continue to agent brief" }).click();
+      await page.getByRole("button", { name: "Draft a finding" }).click();
+      for (const [label, value] of [
+        ["Claim title", "Donation share inflation"],
+        ["Affected code location", "FixtureVault.sol:deposit"],
+        ["Root cause and preconditions", "Donation before victim deposit inflates share price"],
+        ["Observed or expected impact", "Victim receives zero shares"],
+        ["Security invariant", "Victim receives positive shares"],
+        ["Reproduction steps and PoC reference", "Run vulnerable and patched fixtures"],
+      ]) await page.getByLabel(label).fill(value);
+      await page.getByRole("button", { name: "Review and verify" }).click();
+
+      await expect(page.getByTestId("finding-status")).toContainText("Draft only — not yet submitted");
+      await expect(page.getByText("Unsent finding draft")).toBeVisible();
+
+      // Operator token must be denied on program routes.
+      await page.getByLabel("LOCAL PROGRAM TOKEN").fill(operatorToken);
+      await page.getByRole("button", { name: "Open authorized program" }).click();
+      await expect(page.getByTestId("program-error")).toContainText("API token rejected");
+
+      // Team token can open the program but cannot submit or run jobs.
+      await page.getByLabel("LOCAL PROGRAM TOKEN").fill(teamToken);
+      await page.getByRole("button", { name: /Verify PoC/ }).click();
+      await expect(page.locator("#verification").getByRole("alert")).toContainText("researcher role required");
+      await expect(page.getByText(/Signed in locally as team/)).toBeVisible();
+
+      // Invited researcher token submits the claim and runs the vulnerable fixture.
+      await page.getByLabel("LOCAL PROGRAM TOKEN").fill(researcherToken);
+      await page.getByRole("button", { name: /Verify PoC/ }).click();
+      await expect(page.getByTestId("finding-status")).toContainText("Real worker verdict returned — Reproduced", { timeout: 10_000 });
+      await expect(page.locator("#verification")).toContainText("Reproduced");
+      await expect(page.locator("#verification")).toContainText("201");
+      await expect(page.locator("#evidence")).toContainText(vulnDigest);
+      await expect(page.getByRole("region", { name: "Protected program view" })).toContainText("Signed in locally as researcher (demo-researcher)");
+      await expect(page.getByRole("region", { name: "Protected program view" })).toContainText("1 / 4");
+
+      // Researcher runs the patched control fixture on the same submission.
+      await page.getByRole("group", { name: "Choose reviewed fixture" }).getByRole("button", { name: /Patched control/ }).click();
+      await page.getByRole("button", { name: /Verify PoC/ }).click();
+      await expect(page.getByTestId("finding-status")).toContainText("Real worker verdict returned — Not reproduced", { timeout: 10_000 });
+      await expect(page.getByRole("complementary", { name: "Run comparison" })).toContainText("Reproduced");
+      await expect(page.getByRole("complementary", { name: "Run comparison" })).toContainText("Not reproduced");
+      await expect(page.getByRole("region", { name: "Protected program view" })).toContainText("2 / 4");
+    } finally {
+      await researcherContext.close();
+    }
+
+    const teamContext = await browser.newContext({ baseURL });
+    try {
+      const teamPage = await teamContext.newPage();
+      await forwardProgramApi(teamPage);
+
+      await teamPage.goto("/programs/demo-vault");
+      await expect(teamPage.getByRole("navigation", { name: "Finding preparation steps" }).getByRole("button")).toHaveCount(4);
+      await expect(teamPage.getByRole("heading", { name: "Know what you may investigate." })).toBeVisible();
+      await teamPage.getByRole("button", { name: /Verify evidence/ }).click();
+      await teamPage.getByLabel("LOCAL PROGRAM TOKEN").fill(teamToken);
+      await teamPage.getByRole("button", { name: "Open authorized program" }).click();
+
+      const protectedView = teamPage.getByRole("region", { name: "Protected program view" });
+      await expect(protectedView).toContainText("Signed in locally as team (demo-team)");
+      await expect(protectedView).toContainText("2 / 4");
+      await expect(protectedView).toContainText("donation-share-inflation");
+      await expect(protectedView).toContainText("demo-researcher");
+      await expect(teamPage.getByRole("button", { name: "Submit reviewed vault claim" })).toHaveCount(0);
+      await expect(teamPage.getByRole("button", { name: /Run .* fixture/ })).toHaveCount(0);
+
+      // Inspect the first (vulnerable) job and verify private evidence and absence of secrets in URL/storage.
+      await protectedView.getByRole("button", { name: /View private job/ }).first().click();
+      await expect(teamPage.locator("#verification")).toContainText("Reproduced");
+      await expect(teamPage.locator("#verification")).toContainText("201");
+      await expect(teamPage.locator("#evidence")).toContainText(vulnDigest);
+
+      const url = teamPage.url();
+      const storageDump = await teamPage.evaluate(() =>
+        JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } })
+      );
+      for (const secret of [operatorToken, teamToken, researcherToken, vulnDigest, patchedDigest]) {
+        expect(url).not.toContain(secret);
+        expect(storageDump).not.toContain(secret);
+      }
+    } finally {
+      await teamContext.close();
+    }
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
 });

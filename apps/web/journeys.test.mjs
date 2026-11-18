@@ -60,8 +60,17 @@ test("vault detail links to the protected program while preserving the fixed ver
   assert.match(journey, /role="tablist"/);
   assert.match(journey, /href="\/programs\/demo-vault"/);
   assert.match(read("./app/programs/demo-vault/page.tsx"), /<ProgramWorkspace \/>/);
+  assert.match(read("./components/programs/program-workspace.tsx"), /<ReportWizard unlockAllSteps \/>/);
   assert.match(journey, /Runnable fixture/);
   assert.match(read("./app/submit-report/page.tsx"), /<ReportWizard \/>/);
+  const wizard = read("./components/journeys/report-wizard.tsx");
+  assert.match(wizard, /<ProgramConsole/);
+  assert.match(wizard, /Draft only — not yet submitted/);
+  assert.match(wizard, /Claim submitted — awaiting worker verdict/);
+  assert.match(wizard, /Real worker verdict returned/);
+  const consoleSource = read("./components/programs/program-console.tsx");
+  assert.match(consoleSource, /\/v1\/programs\/demo-vault/);
+  assert.doesNotMatch(consoleSource + wizard, /localStorage|sessionStorage/);
   assert.match(read("./app/how-it-works/page.tsx"), /researcher-owned|your own AI agent/);
   const program = JSON.parse(read("./public/data/vault-program.json"));
   assert.equal(program.reward, "None offered");
