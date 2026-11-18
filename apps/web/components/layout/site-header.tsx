@@ -4,8 +4,8 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 export function SiteHeader() {
   return (
-    <header className="site-shell">
-      <div className="site-header">
+    <header className="site-header-wrap">
+      <div className="site-shell site-header">
         <Logo />
         <nav aria-label="Main navigation" className="site-nav">
           <Link className="site-nav-link focus-ring" href="/leaderboard">Leaderboard</Link>
