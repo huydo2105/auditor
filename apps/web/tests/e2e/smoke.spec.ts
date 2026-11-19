@@ -35,7 +35,7 @@ for (const width of [1440, 1024, 390, 320]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/");
     await expect(page.locator(".story-section")).toHaveCount(3);
-    await expect(page.getByText("Payouts available")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Frequently asked questions" })).toBeVisible();
     await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Leaderboard" }).click();
     await expect(page).toHaveURL(/\/leaderboard$/);
     await expect(page.getByRole("heading", { name: "Leaderboard" })).toBeVisible();

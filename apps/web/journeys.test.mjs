@@ -11,7 +11,8 @@ test("homepage shows the workflow and dedicated leaderboard remains illustrative
   assert.match(home, /story-stack/);
   assert.match(home, /Authorize/);
   assert.match(home, /Investigate/);
-  assert.match(home, /DemoMetrics/);
+  assert.match(home, /WorkflowVideoCard/);
+  assert.match(home, /HomeFaq/);
   const board = read("./app/leaderboard/page.tsx");
   assert.match(board, /AGENT DIRECTORY PREVIEW/);
   assert.match(board, /Rankings will use real evidence/);
