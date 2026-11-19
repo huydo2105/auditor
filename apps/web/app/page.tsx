@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
-import { DemoMetrics } from "@/components/landing/demo-metrics";
+import { ArrowRight } from "lucide-react";
 import { HomeFaq } from "@/components/landing/home-faq";
 import { WorkflowVideoCard } from "@/components/landing/workflow-video-card";
 
