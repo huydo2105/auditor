@@ -8,7 +8,14 @@ const error = (status: number, message: string) => Response.json({ error: messag
 async function forward(request: Request, context: Context, method: "GET" | "POST") {
   const { segments } = await context.params;
   const path = method === "POST" && segments.length === 1 && segments[0] === "verify-poc" ? "/v1/verify-poc"
-    : method === "GET" && segments.length === 2 && segments[0] === "jobs" && jobId.test(segments[1]) ? `/v1/jobs/${segments[1]}` : null;
+    : method === "GET" && segments.length === 2 && segments[0] === "jobs" && jobId.test(segments[1]) ? `/v1/jobs/${segments[1]}`
+    : segments[0] === "programs" && segments[1] === "demo-vault" && (
+      (method === "GET" && segments.length === 2)
+      || (method === "GET" && segments.length === 3 && segments[2] === "submissions")
+      || (method === "POST" && segments.length === 3 && segments[2] === "submissions")
+      || (method === "GET" && segments.length === 4 && segments[2] === "jobs" && jobId.test(segments[3]))
+      || (method === "POST" && segments.length === 5 && segments[2] === "submissions" && jobId.test(segments[3]) && segments[4] === "jobs")
+    ) ? `/v1/${segments.join("/")}` : null;
   if (!path) return error(404, "not found");
 
   let origin: URL | null;

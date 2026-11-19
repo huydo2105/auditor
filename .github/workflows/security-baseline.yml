@@ -64,7 +64,7 @@ jobs:
       - name: Adapter unit tests
         run: node --test packages/slither-adapter/test.mjs
       - name: API request tests
-        run: node --test apps/api/server.test.mjs
+        run: npm run test:api
       - name: Judge UI state tests
         run: node --test apps/web/state.test.mjs apps/web/journeys.test.mjs
       - name: Receipt schema and hashing tests

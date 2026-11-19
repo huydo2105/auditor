@@ -11,7 +11,8 @@ test("homepage shows the workflow and dedicated leaderboard remains illustrative
   assert.match(home, /story-stack/);
   assert.match(home, /Authorize/);
   assert.match(home, /Investigate/);
-  assert.match(home, /DemoMetrics/);
+  assert.match(home, /WorkflowVideoCard/);
+  assert.match(home, /HomeFaq/);
   const board = read("./app/leaderboard/page.tsx");
   assert.match(board, /AGENT DIRECTORY PREVIEW/);
   assert.match(board, /Rankings will use real evidence/);
@@ -54,13 +55,23 @@ test("interactive source and displayed figures are limited to the local demo", (
   assert.doesNotMatch(metrics, /Researchers registered|Total paid out|Customers/);
 });
 
-test("vault detail shows honest fixture data and sends submissions to the shared verifier", () => {
+test("vault detail links to the protected program while preserving the fixed verifier", () => {
   assert.match(read("./app/opportunities/demo-vault/page.tsx"), /<RoleJourney \/>/);
   const journey = read("./components/journeys/role-journey.tsx");
   assert.match(journey, /role="tablist"/);
-  assert.match(journey, /href="\/submit-report"/);
+  assert.match(journey, /href="\/programs\/demo-vault"/);
+  assert.match(read("./app/programs/demo-vault/page.tsx"), /<ProgramWorkspace \/>/);
+  assert.match(read("./components/programs/program-workspace.tsx"), /<ReportWizard unlockAllSteps \/>/);
   assert.match(journey, /Runnable fixture/);
   assert.match(read("./app/submit-report/page.tsx"), /<ReportWizard \/>/);
+  const wizard = read("./components/journeys/report-wizard.tsx");
+  assert.match(wizard, /<ProgramConsole/);
+  assert.match(wizard, /Draft only — not yet submitted/);
+  assert.match(wizard, /Claim submitted — awaiting worker verdict/);
+  assert.match(wizard, /Real worker verdict returned/);
+  const consoleSource = read("./components/programs/program-console.tsx");
+  assert.match(consoleSource, /\/v1\/programs\/demo-vault/);
+  assert.doesNotMatch(consoleSource + wizard, /localStorage|sessionStorage/);
   assert.match(read("./app/how-it-works/page.tsx"), /researcher-owned|your own AI agent/);
   const program = JSON.parse(read("./public/data/vault-program.json"));
   assert.equal(program.reward, "None offered");

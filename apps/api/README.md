@@ -13,6 +13,19 @@ $env:VERIPOC_API_TOKEN = ([BitConverter]::ToString($tokenBytes)).Replace('-', ''
 npm run api:dev
 ```
 
+For the authorized local demo, also configure **two distinct** tokens of at least 32 characters before starting the API:
+
+```powershell
+$env:VERIPOC_TEAM_TOKEN = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLower()
+$env:VERIPOC_RESEARCHER_TOKEN = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLower()
+```
+
+The three tokens must differ. `VERIPOC_API_TOKEN` remains the operator token for the original fixed-fixture and internal scan routes. Program tokens work only on `/v1/programs/demo-vault/...`; switching a page does not grant a program role. These are local server configured identities, not production accounts or signed agent access. Never put tokens in committed files or URLs.
+
+`GET /v1/programs/demo-vault` returns scope and the API determined role. `GET /v1/programs/demo-vault/submissions` lists private claims. Only the invited researcher may `POST` the fixed `donation-share-inflation` claim and pinned target SHA-256 to that submissions path. They may then `POST` `{"artifactFormat":"repo-fixture-v1","fixture":"vulnerable"}` (or `"patched"`) to `/v1/programs/demo-vault/submissions/:id/jobs`. `GET /v1/programs/demo-vault/jobs/:id` gives the author and team owner the private job result. Both POSTs need an `Idempotency-Key`.
+
+The program pins SHA-256 values for the reviewed Solidity fixture and Foundry test, permits only those two variants, and allows four runs per server session. If the source bytes change, program submissions and execution fail closed until a reviewed revision updates the pins. Claims, jobs, quota, and idempotency state disappear on restart. The eight external bounty catalog entries remain references to owner programs; public source code does not authorize VeriPoC intake.
+
 Build the trusted worker image before running verification jobs:
 
 ```powershell

@@ -1,21 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, RefreshCw } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EvidencePanel } from "@/components/verification/evidence-panel";
-import type { Fixture, Job, JobResult, JobState } from "@/lib/types";
-import { FIXTURES, VERDICTS, apiError, financialEvidence, parseAcceptance, parseJob, receiptDigest, stageStates } from "@/state.mjs";
-
-const fixtures: Fixture[] = ["vulnerable", "patched"];
-const stages = [
-  ["Input validation", "API accepts only reviewed fixture references"],
-  ["Isolated Foundry execution", "Trusted oracle in a network-disabled worker"],
-  ["Invariant checking", "Verdict derives from the trusted test result"],
-  ["Evidence generation", "Private receipt and local public digest"],
-] as const;
-const stageLabel = { done: "Complete", active: "Running", failed: "Failed", unavailable: "Unavailable", pending: "Pending" } as const;
+import { fixtures, LiveVerificationSection, requestVerificationApi, RunComparisonAside } from "@/components/verification/verification-panels";
+import type { Fixture, Job, JobState } from "@/lib/types";
+import { FIXTURES, parseAcceptance, parseJob } from "@/state.mjs";
 
 export function VerificationConsole({ embedded = false }: { embedded?: boolean }) {
   const [fixture, setFixture] = useState<Fixture>("vulnerable");
@@ -35,10 +27,6 @@ export function VerificationConsole({ embedded = false }: { embedded?: boolean }
   const mounted = useRef(false);
   const current = currentId ? jobs[currentId] ?? null : null;
   const currentFixture = current?.fixture ?? null;
-  const result = current?.result ?? null;
-  const verdict = result ? VERDICTS[result.status] : null;
-  const numbers = financialEvidence(result) as JobResult["financialEvidence"] | null;
-  const progress = stageStates(current) as (keyof typeof stageLabel)[];
 
   useEffect(() => {
     let active = true;
@@ -53,20 +41,9 @@ export function VerificationConsole({ embedded = false }: { embedded?: boolean }
     return () => { active = false; mounted.current = false; for (const timer of activeTimers) window.clearTimeout(timer); activeTimers.clear(); };
   }, []);
 
-  async function apiRequest(path: string, apiToken: string, options: RequestInit = {}) {
-    let response: Response;
-    try {
-      response = await fetch(path, { ...options, credentials: "omit", cache: "no-store", headers: { ...options.headers, Authorization: `Bearer ${apiToken}` } });
-    } catch { throw new Error("The verification API is unavailable. Start it and retry."); }
-    let data: unknown;
-    try { data = await response.json(); } catch { throw new Error("The API returned an unreadable response."); }
-    if (!response.ok) throw new Error(apiError(response.status, (data as { error?: string })?.error));
-    return data;
-  }
-
   async function poll(id: string, selected: Fixture, apiToken: string) {
     try {
-      const data = await apiRequest(`/v1/jobs/${id}`, apiToken);
+      const data = await requestVerificationApi(`/v1/jobs/${id}`, apiToken);
       const job = parseJob(data, id, selected) as Job;
       if (!mounted.current) return;
       setJobs(previous => ({ ...previous, [id]: job }));
@@ -91,12 +68,12 @@ export function VerificationConsole({ embedded = false }: { embedded?: boolean }
     const key = pendingKeys.current[selected] ?? crypto.randomUUID();
     pendingKeys.current[selected] = key;
     try {
-      const accepted = parseAcceptance(await apiRequest("/v1/verify-poc", token, {
+      const accepted = parseAcceptance(await requestVerificationApi("/v1/verify-poc", token, {
         method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": key },
         body: JSON.stringify({ artifactFormat: "repo-fixture-v1", fixture: selected }),
       })) as { id: string; state: JobState };
       const job: Job = accepted.state === "finished"
-        ? parseJob(await apiRequest(`/v1/jobs/${accepted.id}`, token), accepted.id, selected) as Job
+        ? parseJob(await requestVerificationApi(`/v1/jobs/${accepted.id}`, token), accepted.id, selected) as Job
         : { id: accepted.id, kind: "verify", fixture: selected, state: accepted.state, result: null };
       delete pendingKeys.current[selected];
       setJobs(previous => ({ ...previous, [accepted.id]: job }));
@@ -143,21 +120,23 @@ export function VerificationConsole({ embedded = false }: { embedded?: boolean }
           <p className="mt-5 text-xs leading-relaxed text-muted">Local EVM fixtures only. The worker runs without network access.</p>
         </Card></section>
 
-        <section id="verification" className="scroll-mt-8" aria-labelledby="verification-title"><div className="mb-4 flex flex-wrap items-end justify-between gap-3"><div><h2 id="verification-title" className="text-2xl font-semibold">Live verification</h2></div><span role="status" aria-live="polite" className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-forest">{current?.state.toUpperCase() ?? "AWAITING SUBMISSION"}</span></div><Card className="p-5 md:p-7">
-          <p className="text-xs font-semibold text-muted">CURRENT JOB</p><p className="mono-data mt-1 text-sm font-semibold">{current?.id ?? "No job submitted"}</p><p className="mt-3 text-sm text-muted">{!current ? "Choose a reviewed fixture and press Verify PoC." : current.state === "finished" ? `Foundry run finished for ${FIXTURES[current.fixture].name}. Inspect the returned verdict and evidence.` : current.state === "queued" ? "The API accepted the fixture; execution is waiting in the queue." : "The trusted Foundry oracle is running. Evidence follows after completion."}</p>
-          <ol className="mt-5 divide-y divide-line border-y border-line">{stages.map(([title, detail], index) => <li key={title} className="flex items-center gap-3 py-4"><span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line text-xs text-forest">{index + 1}</span><div className="min-w-0 flex-1"><strong className="block text-sm">{title}</strong><span className="text-xs text-muted">{detail}</span></div><span className="text-xs font-semibold text-forest">{stageLabel[progress[index]]}</span></li>)}</ol>
-          {message && <div role="alert" className="verification-error mt-5 rounded-lg p-3 text-sm">{message}</div>}
-          {canRetryStatus && current && <Button variant="outline" type="button" className="mt-3" onClick={() => { setMessage(""); void poll(current.id, current.fixture, token); }}><RefreshCw size={16} aria-hidden="true" />Retry status lookup</Button>}
-          <div className="mt-6 border-t border-line pt-5"><p className="mb-1 text-xs font-semibold text-muted">VERDICT</p><strong className={`text-xl ${result?.status === "reproduced" ? "verification-danger" : result?.status === "not_reproduced" ? "text-forest" : "text-ink"}`}>{verdict?.label ?? "Awaiting run"}</strong><p className="mt-2 text-sm leading-relaxed text-muted">{verdict ? `${verdict.explanation}${result?.reason ? ` Worker reason: ${result.reason}.` : ""}` : "A verdict appears only after the API returns a finished job."}</p></div>
-          <dl className="mt-5 grid gap-3 sm:grid-cols-3">{[["ATTACKER BEFORE", numbers?.attackerBefore], ["ATTACKER AFTER", numbers?.attackerAfter], ["VICTIM SHARES", numbers?.victimShares]].map(([label, value]) => <div key={label} className="rounded-lg border border-line bg-page p-3"><dt className="text-xs font-semibold text-muted">{label}</dt><dd className="mono-data mt-2 text-sm font-semibold">{value ?? "Not captured"}</dd></div>)}</dl><p className="mt-3 text-xs text-muted">{numbers ? "Measured values returned by this job's structured execution evidence." : "Measured values appear only when real execution returns a complete evidence set."}</p>
-        </Card></section>
+        <LiveVerificationSection
+          current={current}
+          message={message}
+          canRetryStatus={canRetryStatus}
+          onRetry={() => {
+            if (!current) return;
+            setMessage("");
+            void poll(current.id, current.fixture, token);
+          }}
+        />
 
         <EvidencePanel job={current} fixture={currentFixture} copied={copyLabel} onCopy={() => void copyEvidence()} />
 
         <section id="identity" aria-labelledby="identity-title"><div className="mb-4"><h2 id="identity-title" className="text-2xl font-semibold">Concordium identity</h2></div><Card className="p-5 md:p-7"><h3 className="text-lg font-semibold">Published Agent Card · Agent #1067</h3><p className="mt-2 text-sm text-muted">{identityState}</p><div className="mt-4 flex flex-wrap gap-4 text-sm"><a className="focus-ring text-forest underline underline-offset-4" href="/.well-known/agent-card.json" target="_blank" rel="noopener noreferrer">View Agent Card</a><a className="focus-ring text-forest underline underline-offset-4" href="https://agent-registry-mcp.concordium.com/v1/check-badge/JyP9UhUtd9AeJywDRsg5q" target="_blank" rel="noopener noreferrer">Registry badge check</a></div><div className="mt-5 grid gap-3 border-t border-line pt-5 sm:grid-cols-2"><p className="text-sm text-muted"><strong className="block text-ink">Signed requests · Planned</strong>Signed request authentication is not established by the local bearer token.</p><p className="text-sm text-muted"><strong className="block text-ink">Testnet anchoring · Planned</strong>The current digest has no confirmed Testnet transaction.</p></div></Card></section>
       </div>
 
-      <aside className="lg:sticky lg:top-6" aria-label="Run comparison"><Card className="p-5"><h2 className="mb-2 text-lg font-semibold">Run comparison</h2><p className="mb-4 text-xs text-muted">Both runs use the reviewed attack sequence and trusted fixture assertions.</p>{fixtures.map(key => { const job = lastByFixture[key] ? jobs[lastByFixture[key]!] : null; return <div key={key} className="border-t border-line py-3"><p className="text-xs font-semibold text-muted">{key === "vulnerable" ? "VULNERABLE VAULT" : "PATCHED CONTROL"}</p><strong className="mt-1 block text-sm">{job?.state === "finished" && job.result ? VERDICTS[job.result.status].label : job?.state === "running" ? "Running" : job?.state === "queued" ? "Queued" : "Not run"}</strong><span className="mono-data mt-1 block text-xs text-muted">{receiptDigest(job?.result) ?? "No receipt digest"}</span></div>; })}<p className="mt-3 text-xs text-muted">A not-reproduced control result is not a general security certification.</p></Card></aside>
+      <RunComparisonAside jobs={jobs} lastByFixture={lastByFixture} />
     </div>
   </Container>;
 }
