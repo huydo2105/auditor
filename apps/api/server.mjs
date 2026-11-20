@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { DEMO_PROGRAM, fixtureRevisionMatches, publicProgram } from "./program.mjs";
+import { authorizeAgentRequest, lookupConcordiumAgent, pruneExpiredNonces } from "./agent-auth.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = value => createHash("sha256").update(value).digest("hex");
@@ -22,6 +23,12 @@ const equalToken = (given, expected) => {
 };
 async function readBody(req) {
   if (req.headers["content-type"]?.split(";")[0] !== "application/json") throw fail(415, "JSON body required");
+  const raw = await readRawBody(req);
+  try { return JSON.parse(raw.toString("utf8")); }
+  catch { throw fail(400, "invalid JSON"); }
+}
+async function readRawBody(req) {
+  if (req.rawBody) return req.rawBody;
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
@@ -29,8 +36,8 @@ async function readBody(req) {
     if (size > 4096) throw fail(413, "request too large");
     chunks.push(chunk);
   }
-  try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-  catch { throw fail(400, "invalid JSON"); }
+  req.rawBody = Buffer.concat(chunks);
+  return req.rawBody;
 }
 function validBody(kind, body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return false;
@@ -58,17 +65,22 @@ export function executeJob(kind, body) {
   });
 }
 export function createApiServer({ token, teamToken, researcherToken, invitedResearcherIds = DEMO_PROGRAM.invitedResearcherIds,
+  invitedAgentBadges = [], agentDomain, lookupAgent = lookupConcordiumAgent,
   execute = executeJob, now = Date.now, maxJobs = 16 } = {}) {
   if (typeof token !== "string" || token.length < 32) throw new Error("VERIPOC_API_TOKEN must be at least 32 characters");
   const configured = [teamToken, researcherToken].filter(value => value !== undefined);
   if (configured.some(value => typeof value !== "string" || value.length < 32)
     || (configured.length && (configured.length !== 2 || new Set([token, teamToken, researcherToken]).size !== 3)))
     throw new Error("distinct VERIPOC_TEAM_TOKEN and VERIPOC_RESEARCHER_TOKEN of at least 32 characters are required together");
+  if (!Array.isArray(invitedAgentBadges) || invitedAgentBadges.some(badge => typeof badge !== "string")
+    || (invitedAgentBadges.length && (!agentDomain || !teamToken || !researcherToken)))
+    throw new Error("signed agent access requires an explicit domain, invitation, and both program tokens");
   const jobs = new Map();
   const idempotency = new Map();
   const submissions = new Map();
   let programRuns = 0;
   const buckets = new Map();
+  const usedAgentNonces = new Map();
   let running = false;
   const queue = [];
   const pump = () => {
@@ -101,8 +113,20 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
     }
     if (!path.startsWith("/v1/")) return json(res, 404, { error: "not found" });
     const isProgram = path.startsWith("/v1/programs/");
-    const actor = equalToken(req.headers.authorization, teamToken) && teamToken ? { id: DEMO_PROGRAM.ownerId, role: "team" }
+    let actor = equalToken(req.headers.authorization, teamToken) && teamToken ? { id: DEMO_PROGRAM.ownerId, role: "team" }
       : equalToken(req.headers.authorization, researcherToken) && researcherToken ? { id: DEMO_PROGRAM.invitedResearcherIds[0], role: "researcher" } : null;
+    if (isProgram && !req.headers.authorization && invitedAgentBadges.length) {
+      let signedBody;
+      try { signedBody = req.method === "POST" ? await readRawBody(req) : Buffer.alloc(0); }
+      catch (error) { return json(res, error.status ?? 400, { error: error.message }); }
+      try {
+        pruneExpiredNonces(usedAgentNonces, now());
+        actor = await authorizeAgentRequest({ headers: req.headers, method: req.method, path,
+          body: signedBody,
+          domain: agentDomain, invitedBadges: invitedAgentBadges, lookup: lookupAgent,
+          now, usedNonces: usedAgentNonces });
+      } catch { actor = null; }
+    }
     if (isProgram ? !actor : !equalToken(req.headers.authorization, token)) return json(res, 401, { error: "unauthorized" });
     const key = `${req.socket.remoteAddress}:${req.method === "POST" ? "write" : "read"}`;
     const limit = req.method === "POST" ? (isProgram ? 20 : 5) : 120;
@@ -116,7 +140,8 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
       if (isProgram) {
         const segments = path.split("/").slice(3);
         if (segments[0] !== DEMO_PROGRAM.id) return json(res, 404, { error: "program not found" });
-        if (actor.role === "researcher" && !invitedResearcherIds.includes(actor.id))
+        if (actor.role === "researcher" && !invitedResearcherIds.includes(actor.id)
+          && !(actor.badge && invitedAgentBadges.includes(actor.badge)))
           return json(res, 403, { error: "not invited" });
         if (req.method === "GET" && segments.length === 1)
           return json(res, 200, { program: publicProgram(programRuns), actor });

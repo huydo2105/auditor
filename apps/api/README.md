@@ -20,7 +20,28 @@ $env:VERIPOC_TEAM_TOKEN = [Convert]::ToHexString([Security.Cryptography.RandomNu
 $env:VERIPOC_RESEARCHER_TOKEN = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLower()
 ```
 
-The three tokens must differ. `VERIPOC_API_TOKEN` remains the operator token for the original fixed-fixture and internal scan routes. Program tokens work only on `/v1/programs/demo-vault/...`; switching a page does not grant a program role. These are local server configured identities, not production accounts or signed agent access. Never put tokens in committed files or URLs.
+The three tokens must differ. `VERIPOC_API_TOKEN` remains the operator token for the original fixed-fixture and internal scan routes. Program tokens work only on `/v1/programs/demo-vault/...`; switching a page does not grant a program role. These are local server configured identities, not production accounts. Never put tokens in committed files or URLs.
+
+### Optional signed Concordium agent access (Issue #12)
+
+The API also accepts a **direct**, signed request from an explicitly invited CIS-8004 Testnet agent on the Demo Vault program routes. This does not replace the local team/researcher tokens or grant team powers. Configure a domain unique to this local API and the exact invited badge before starting it:
+
+```powershell
+$env:VERIPOC_AGENT_DOMAIN = 'veripoc.local'
+$env:VERIPOC_INVITED_AGENT_BADGES = 'JyP9UhUtd9AeJywDRsg5q'
+npm run api:dev
+```
+
+The invitation is server configuration. A valid badge alone grants no access. Before enabling it, check the current public Testnet badge, Agent Card hash, and CIS-8 owner binding with `node apps/api/check-agent.mjs JyP9UhUtd9AeJywDRsg5q`. The API repeats those lookups on every signed request and fails closed if the registry is unavailable, revoked, stale, or unlinked. It uses Concordium's hosted registry service as a trusted resolver rather than querying a node independently. The registered key's operator must set `EVM_PRIVATE_KEY` locally; never send it to VeriPoC or commit it. To make one real signed scope request:
+
+```powershell
+$env:VERIPOC_AGENT_BADGE = 'JyP9UhUtd9AeJywDRsg5q'
+$env:VERIPOC_AGENT_DOMAIN = 'veripoc.local'
+# Set EVM_PRIVATE_KEY in your private shell without printing it.
+node apps/api/sign-agent-request.mjs GET /v1/programs/demo-vault
+```
+
+The helper checks that the local signing key is the active CIS-8 key before sending. For POST, pass a local JSON body file as the final argument and use an approved program path. The signed envelope has `X-VeriPoC-Agent-Badge`, `Nonce`, `Expires` (Unix milliseconds), and `Signature` headers. Its Ethereum personal-sign message is newline-delimited: `veripoc-agent-request-v1`, configured domain, Testnet CAIP-2 chain, uppercase HTTP method, pathname, SHA-256 of exact request body bytes, nonce, expiry. A nonce is accepted once; expiry must be in the next five minutes. A retry after uncertain acceptance needs a **new signed nonce** and the same `Idempotency-Key`. This process-local replay cache and hosted resolver are demo constraints, not a durable production identity service. The browser proxy does not expose agent signing; the agent gateway is Issue #13.
 
 `GET /v1/programs/demo-vault` returns scope and the API determined role. `GET /v1/programs/demo-vault/submissions` lists private claims. Only the invited researcher may `POST` the fixed `donation-share-inflation` claim and pinned target SHA-256 to that submissions path. They may then `POST` `{"artifactFormat":"repo-fixture-v1","fixture":"vulnerable"}` (or `"patched"`) to `/v1/programs/demo-vault/submissions/:id/jobs`. `GET /v1/programs/demo-vault/jobs/:id` gives the author and team owner the private job result. Both POSTs need an `Idempotency-Key`.
 

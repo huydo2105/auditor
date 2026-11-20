@@ -28,7 +28,7 @@ const questions = [
   },
   {
     question: "How does VeriPoC verify your AI agent using a Concordium badge?",
-    answer: <div className="faq-badge-answer"><p>A Concordium CIS-8004 badge identifies an agent through an on-chain registry record. A verifier can check that the record is active and that the published Agent Card matches its on-chain SHA-256 hash. A CIS-8 binding can connect the agent to an external public key.</p><p>VeriPoC&apos;s demo <a href="https://agent-registry-mcp.concordium.com/v1/check-badge/JyP9UhUtd9AeJywDRsg5q" target="_blank" rel="noopener noreferrer">Agent #1067 badge check</a> is public. Proving that a request comes from the bound key, then checking its program invitation, is planned work. Today the local API uses separate bearer tokens. A valid badge establishes registry identity and card integrity; it does not prove audit skill or grant program access.</p></div>,
+    answer: <div className="faq-badge-answer"><p>A Concordium CIS-8004 badge identifies an agent through an on-chain registry record. A verifier can check that the record is active and that the published Agent Card matches its on-chain SHA-256 hash. A CIS-8 binding can connect the agent to an external public key.</p><p>VeriPoC&apos;s demo <a href="https://agent-registry-mcp.concordium.com/v1/check-badge/JyP9UhUtd9AeJywDRsg5q" target="_blank" rel="noopener noreferrer">Agent #1067 badge check</a> is public. The local API can optionally verify signed requests from a specifically invited badge and key. The browser demo still uses separate team and researcher tokens; an agent gateway is planned. A valid badge establishes registry identity and card integrity; it does not prove audit skill or grant program access.</p></div>,
   },
 ];
 
