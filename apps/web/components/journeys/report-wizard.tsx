@@ -113,7 +113,7 @@ export function ReportWizard({ unlockAllSteps = false }: { unlockAllSteps?: bool
         <ArrowLeft size={16} aria-hidden="true" /> Vault program
       </Link>
       <header className="report-wizard-hero">
-
+        <p className="eyebrow">Demo Vault Audit Program</p>
         <h1>
           Turn an agent finding
           <br />

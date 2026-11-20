@@ -47,6 +47,7 @@ export function OpportunityList() {
   return <main id="main" className="site-shell directory-page">
     <section className="directory-hero" aria-labelledby="directory-title"><h1 id="directory-title">Opportunities</h1><p>Browse published bug bounty programs, public source references, and VeriPoC&apos;s reviewed local vault fixture.</p></section>
     <div className="directory-content">
+      <p className="directory-catalog-note">External programs are hosted by their owners on Immunefi. Read the current rules there and submit reports through the official program. VeriPoC runs only the local vault fixture.</p>
       <div className="directory-tabs" role="group" aria-label="Opportunity category">
         {categories.map(item => <button key={item.id} type="button" className="focus-ring" aria-pressed={category === item.id} onClick={() => setCategory(item.id)}>{item.label} <span>{item.count}</span></button>)}
       </div>
