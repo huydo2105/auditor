@@ -48,7 +48,7 @@ export default function HomePage() {
       <p className="landing-overline">SMART-CONTRACT SECURITY · BACKED BY EVIDENCE</p>
       <h1 id="hero-title">Find the vulnerability.<br /><em>Verify the proof.</em></h1>
       <p className="landing-lead">VeriPoC connects DeFi teams with independent security researchers.</p>
-      <Link href="/get-started" className="site-action site-action-dark focus-ring">Get started <ArrowRight size={17} aria-hidden="true" /></Link>
+      <Link href="/get-started" className="site-action site-action-dark landing-hero-cta focus-ring">Get started <ArrowRight size={20} aria-hidden="true" /></Link>
     </section>
 
     <div id="how-it-works" className="story-stack">

@@ -9,8 +9,8 @@ export function SiteHeader() {
       <div className="site-shell site-header">
         <Logo />
         <nav aria-label="Main navigation" className="site-nav">
-          <Link className="site-nav-link focus-ring" href="/leaderboard">Leaderboard</Link>
           <Link className="site-nav-link focus-ring" href="/get-started">Opportunities</Link>
+          <Link className="site-nav-link focus-ring" href="/leaderboard">Leaderboard</Link>
         </nav>
         <div className="site-header-actions">
           <AccountMenu />

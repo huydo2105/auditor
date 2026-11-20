@@ -14,11 +14,13 @@ test("brand mark keeps its accessible home link and adapts to both themes", asyn
   expect(box?.width).toBeGreaterThanOrEqual(44);
   expect(box?.height).toBeGreaterThanOrEqual(44);
 
-  await page.getByRole("button", { name: "Paper" }).click();
+  if (await page.getByRole("button", { name: "Switch to light mode" }).isVisible()) {
+    await page.getByRole("button", { name: "Switch to light mode" }).click();
+  }
   await expect.poll(() => page.locator("body").evaluate(body => getComputedStyle(body).backgroundColor)).toBe("rgb(246, 245, 242)");
   const lightStroke = await brand.locator("path").first().evaluate(path => getComputedStyle(path).stroke);
   await page.screenshot({ path: testInfo.outputPath("brand-light-1440.png"), fullPage: false });
-  await page.getByRole("button", { name: "Charcoal" }).click();
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
   await expect.poll(() => page.locator("body").evaluate(body => getComputedStyle(body).backgroundColor)).toBe("rgb(20, 20, 20)");
   const darkStroke = await brand.locator("path").first().evaluate(path => getComputedStyle(path).stroke);
   expect(lightStroke).not.toBe(darkStroke);
@@ -26,7 +28,12 @@ test("brand mark keeps its accessible home link and adapts to both themes", asyn
   await brand.focus();
   await expect(brand).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "Connect Concordium wallet" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Opportunities" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.screenshot({ path: testInfo.outputPath("brand-dark-390.png"), fullPage: false });
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   const favicon = await page.request.get("/brand/veripoc-app-icon.svg");
   expect(favicon.ok()).toBe(true);
   expect(await favicon.text()).toContain("#ee9077");
