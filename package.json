@@ -13,7 +13,7 @@
     "test:receipt": "node --test packages/core/receipt.test.mjs",
     "run:worker": "node workers/sandbox/cli.mjs",
     "api:dev": "node apps/api/start.mjs",
-    "test:api": "node --test apps/api/server.test.mjs apps/api/program.test.mjs apps/api/agent-auth.test.mjs",
+    "test:api": "node --test apps/api/server.test.mjs apps/api/program.test.mjs apps/api/agent-auth.test.mjs apps/api/wallet-auth.test.mjs",
     "web:dev": "npm run dev --workspace @veripoc/web",
     "web:build": "npm run build --workspace @veripoc/web",
     "web:typecheck": "npm run typecheck --workspace @veripoc/web",
@@ -25,6 +25,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@concordium/web-sdk": "^12.0.3",
     "dotenv": "^18.0.10",
     "viem": "^2.57.17"
   },

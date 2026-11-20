@@ -6,12 +6,13 @@ import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { DEMO_PROGRAM, fixtureRevisionMatches, publicProgram } from "./program.mjs";
 import { authorizeAgentRequest, lookupConcordiumAgent, pruneExpiredNonces } from "./agent-auth.mjs";
+import { createWalletAuthStore, formatClearSessionCookie, formatSessionCookie } from "./wallet-auth.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = value => createHash("sha256").update(value).digest("hex");
-const json = (res, code, value) => {
+const json = (res, code, value, extraHeaders = {}) => {
   res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
-    "x-content-type-options": "nosniff" });
+    "x-content-type-options": "nosniff", ...extraHeaders });
   res.end(JSON.stringify(value));
 };
 const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -66,6 +67,8 @@ export function executeJob(kind, body) {
 }
 export function createApiServer({ token, teamToken, researcherToken, invitedResearcherIds = DEMO_PROGRAM.invitedResearcherIds,
   invitedAgentBadges = [], agentDomain, lookupAgent = lookupConcordiumAgent,
+  allowedOrigins = [], teamAccounts = [], invitedResearcherAccounts = [], lookupAccountInfo,
+  secureCookies = process.env.NODE_ENV === "production",
   execute = executeJob, now = Date.now, maxJobs = 16 } = {}) {
   if (typeof token !== "string" || token.length < 32) throw new Error("VERIPOC_API_TOKEN must be at least 32 characters");
   const configured = [teamToken, researcherToken].filter(value => value !== undefined);
@@ -75,6 +78,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
   if (!Array.isArray(invitedAgentBadges) || invitedAgentBadges.some(badge => typeof badge !== "string")
     || (invitedAgentBadges.length && (!agentDomain || !teamToken || !researcherToken)))
     throw new Error("signed agent access requires an explicit domain, invitation, and both program tokens");
+  const walletAuth = createWalletAuthStore({ allowedOrigins, teamAccounts, invitedResearcherAccounts, lookupAccountInfo, now });
   const jobs = new Map();
   const idempotency = new Map();
   const submissions = new Map();
@@ -112,10 +116,62 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
       return;
     }
     if (!path.startsWith("/v1/")) return json(res, 404, { error: "not found" });
+    const isAuth = path.startsWith("/v1/auth/");
+    if (isAuth) {
+      const authKey = `${req.socket.remoteAddress}:auth:${req.method === "POST" ? "write" : "read"}`;
+      const authLimit = req.method === "POST" ? 30 : 120;
+      const authBucket = buckets.get(authKey);
+      const authNow = now();
+      const nextAuth = !authBucket || authNow - authBucket.start >= 60_000 ? { start: authNow, count: 0 } : authBucket;
+      nextAuth.count++;
+      buckets.set(authKey, nextAuth);
+      if (nextAuth.count > authLimit) return json(res, 429, { error: "rate limit exceeded" });
+      const secure = Boolean(secureCookies || req.headers["x-forwarded-proto"] === "https");
+      try {
+        if (req.method === "GET" && path === "/v1/auth/me") {
+          return json(res, 200, walletAuth.getMe(req.headers.cookie));
+        }
+        if (req.method === "POST" && path === "/v1/auth/concordium/challenge") {
+          const body = await readBody(req);
+          if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).join() !== "account")
+            throw fail(400, "only account is accepted");
+          return json(res, 200, walletAuth.issueChallenge({ account: body.account, origin: req.headers.origin }));
+        }
+        if (req.method === "POST" && path === "/v1/auth/concordium/verify") {
+          const body = await readBody(req);
+          if (!body || typeof body !== "object" || Array.isArray(body)
+            || Object.keys(body).sort().join() !== "account,challengeId,signature")
+            throw fail(400, "challengeId, account and signature are required");
+          const { sessionId, session } = await walletAuth.verifyLogin({
+            challengeId: body.challengeId, account: body.account, origin: req.headers.origin, signature: body.signature,
+          });
+          return json(res, 200, session, { "set-cookie": formatSessionCookie(sessionId, { secure }) });
+        }
+        if (req.method === "POST" && path === "/v1/auth/role") {
+          const body = await readBody(req);
+          if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).join() !== "requestedRole")
+            throw fail(400, "requestedRole is required");
+          const session = walletAuth.setOnboardingRole({
+            cookieHeader: req.headers.cookie, origin: req.headers.origin,
+            csrfHeader: req.headers["x-veripoc-csrf"], requestedRole: body.requestedRole,
+          });
+          return json(res, 200, session);
+        }
+        if (req.method === "POST" && path === "/v1/auth/logout") {
+          const result = walletAuth.logout({
+            cookieHeader: req.headers.cookie, origin: req.headers.origin, csrfHeader: req.headers["x-veripoc-csrf"],
+          });
+          return json(res, 200, result, { "set-cookie": formatClearSessionCookie({ secure }) });
+        }
+        return json(res, 404, { error: "not found" });
+      } catch (error) {
+        return json(res, error.status ?? 500, { error: error.status ? error.message : "internal error" });
+      }
+    }
     const isProgram = path.startsWith("/v1/programs/");
     let actor = equalToken(req.headers.authorization, teamToken) && teamToken ? { id: DEMO_PROGRAM.ownerId, role: "team" }
       : equalToken(req.headers.authorization, researcherToken) && researcherToken ? { id: DEMO_PROGRAM.invitedResearcherIds[0], role: "researcher" } : null;
-    if (isProgram && !req.headers.authorization && invitedAgentBadges.length) {
+    if (isProgram && !req.headers.authorization && invitedAgentBadges.length && req.headers["x-veripoc-agent-badge"]) {
       let signedBody;
       try { signedBody = req.method === "POST" ? await readRawBody(req) : Buffer.alloc(0); }
       catch (error) { return json(res, error.status ?? 400, { error: error.message }); }
@@ -126,6 +182,20 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
           domain: agentDomain, invitedBadges: invitedAgentBadges, lookup: lookupAgent,
           now, usedNonces: usedAgentNonces });
       } catch { actor = null; }
+    }
+    if (isProgram && !actor && !req.headers.authorization && !req.headers["x-veripoc-agent-badge"] && req.headers.cookie) {
+      const requestedProgramId = path.split("/")[3] ?? "";
+      try {
+        actor = walletAuth.programActorFromCookie({
+          cookieHeader: req.headers.cookie, method: req.method, origin: req.headers.origin,
+          csrfHeader: req.headers["x-veripoc-csrf"], programId: requestedProgramId,
+        });
+      } catch (error) {
+        return json(res, error.status ?? 403, { error: error.message });
+      }
+      if (!actor && walletAuth.readSessionFromCookie(req.headers.cookie)) {
+        return json(res, 403, { error: "account is not authorized for this program" });
+      }
     }
     if (isProgram ? !actor : !equalToken(req.headers.authorization, token)) return json(res, 401, { error: "unauthorized" });
     const key = `${req.socket.remoteAddress}:${req.method === "POST" ? "write" : "read"}`;
@@ -141,7 +211,8 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
         const segments = path.split("/").slice(3);
         if (segments[0] !== DEMO_PROGRAM.id) return json(res, 404, { error: "program not found" });
         if (actor.role === "researcher" && !invitedResearcherIds.includes(actor.id)
-          && !(actor.badge && invitedAgentBadges.includes(actor.badge)))
+          && !(actor.badge && invitedAgentBadges.includes(actor.badge))
+          && actor.authMethod !== "concordium-wallet")
           return json(res, 403, { error: "not invited" });
         if (req.method === "GET" && segments.length === 1)
           return json(res, 200, { program: publicProgram(programRuns), actor });
