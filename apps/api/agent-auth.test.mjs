@@ -32,9 +32,10 @@ function registryState() {
   };
 }
 
-async function withServer(fn, { state = registryState(), invitedAgentBadges = [badge], now = Date.now } = {}) {
+async function withServer(fn, { state = registryState(), invitedAgentBadges = [badge], now = Date.now,
+  lookupAgent = async () => state } = {}) {
   const server = createApiServer({ token, teamToken, researcherToken, invitedAgentBadges,
-    agentDomain: domain, lookupAgent: async () => state, now,
+    agentDomain: domain, lookupAgent, now,
     execute: async (_kind, body) => ({ status: body.fixture === "vulnerable" ? "reproduced" : "not_reproduced",
       receipt: { private: true, input: { sourceSha256: DEMO_PROGRAM.workerInputSha256 } } }) });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -105,6 +106,24 @@ test("replay, forged key, wrong domain, wrong program and invalid fixture fail",
       payload: { artifactFormat: "repo-fixture-v1", fixture: "external" } })).status, 400);
     assert.equal((await signed(base, `${root}/jobs/${randomUUID()}`)).status, 404);
   });
+});
+
+test("concurrent copies of one signed POST consume the nonce once", async () => {
+  const payload = { claim: "donation-share-inflation", targetSha256: DEMO_PROGRAM.targetSha256 };
+  const nonce = randomUUID();
+  await withServer(async base => {
+    const attempts = await Promise.all([1, 2].map(() => signed(base, `${root}/submissions`, {
+      method: "POST", payload, nonce, idempotencyKey: randomUUID(),
+    })));
+    assert.deepEqual(attempts.map(item => item.status).sort(), [201, 401]);
+    const listing = await fetch(`${base}${root}/submissions`, {
+      headers: { authorization: `Bearer ${teamToken}` },
+    });
+    assert.equal((await listing.json()).submissions.length, 1);
+  }, { lookupAgent: async () => {
+    await new Promise(resolve => setTimeout(resolve, 25));
+    return registryState();
+  } });
 });
 
 test("missing invitation, expiry, revoked badge, stale card, and unlinked CIS-8 key fail closed", async () => {

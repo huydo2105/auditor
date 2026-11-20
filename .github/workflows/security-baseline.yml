@@ -52,6 +52,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --omit=dev
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.9.0
@@ -106,6 +111,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --omit=dev
       - name: Worker controller tests
         run: node --test workers/sandbox/test.mjs workers/sandbox/report.test.mjs
       - name: Build trusted worker image

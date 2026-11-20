@@ -54,8 +54,9 @@ export async function authorizeAgentRequest({ headers, method, path, body, domai
     || typeof expiresRaw !== "string" || !/^[0-9]{10,13}$/.test(expiresRaw)
     || typeof signature !== "string" || !/^0x[0-9a-fA-F]{130}$/.test(signature)) return null;
   const expires = Number(expiresRaw);
+  const nonceKey = `${badge}:${nonce}`;
   if (!Number.isSafeInteger(expires) || expires <= now() || expires > now() + MAX_SKEW_MS
-    || usedNonces.has(`${badge}:${nonce}`)) return null;
+    || usedNonces.has(nonceKey)) return null;
   try {
     const { check, agent, binding } = await lookup(badge);
     const key = agent.external_reference?.key;
@@ -82,7 +83,9 @@ export async function authorizeAgentRequest({ headers, method, path, body, domai
     const message = agentMessage({ domain, method, path, body, nonce, expires });
     const recovered = await recoverPublicKey({ hash: hashMessage(message), signature });
     if (recovered.toLowerCase() !== `0x${key.public_key_hex.toLowerCase()}`) return null;
-    usedNonces.set(`${badge}:${nonce}`, expires);
+    // No await between the final check and consumption: concurrent replays lose here.
+    if (expires <= now() || usedNonces.has(nonceKey)) return null;
+    usedNonces.set(nonceKey, expires);
     return { id: `agent:${badge}`, role: "researcher", badge };
   } catch { return null; }
 }
