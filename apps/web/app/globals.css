@@ -730,7 +730,7 @@ summary { cursor: pointer; }
 html { scroll-padding-top: 96px; }
 .site-header-wrap { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--line); background: var(--page); }
 .site-header-wrap .site-header { border-bottom: 0; }
-.landing-hero .landing-hero-cta { min-width: 214px; min-height: 58px; padding: 13px 27px; gap: 14px; font-size: 1rem; }
+.landing-hero .landing-hero-cta { min-width: 260px; min-height: 72px; padding: 16px 32px; gap: 18px; font-size: 1.25rem; }
 .faq-section { padding: 0 0 clamp(90px, 10vw, 150px); }
 .faq-inner { max-width: 1000px; }
 .faq-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 30px; }
@@ -805,8 +805,6 @@ html { scroll-padding-top: 96px; }
 .account-dropdown-item:hover { background: var(--page); color: var(--accent); }
 .account-signout { color: var(--danger); }
 .account-signout:hover { background: var(--danger-soft); color: var(--danger); }
-.account-alert { position: absolute; top: calc(100% + 10px); right: 0; z-index: 60; display: flex; align-items: flex-start; gap: 10px; width: min(320px, calc(100vw - 32px)); padding: 11px 13px; border-radius: 12px; font-size: .8rem; line-height: 1.45; box-shadow: 0 14px 32px rgb(20 20 20 / 12%); }
-.account-alert-close { flex: none; padding: 0 4px; border: 0; background: transparent; color: inherit; font-size: 1.1rem; line-height: 1; }
 @media (max-width: 720px) {
   .site-header { grid-template-columns: auto 1fr; gap: 4px 12px; }
   .site-shell { width: min(100% - 28px, 1220px); }

@@ -13,6 +13,11 @@ test("brand mark keeps its accessible home link and adapts to both themes", asyn
   const box = await brand.boundingBox();
   expect(box?.width).toBeGreaterThanOrEqual(44);
   expect(box?.height).toBeGreaterThanOrEqual(44);
+  const heroAction = page.getByRole("link", { name: "Get started" });
+  const actionBox = await heroAction.boundingBox();
+  expect(actionBox?.width).toBeGreaterThanOrEqual(260);
+  expect(actionBox?.height).toBeGreaterThanOrEqual(72);
+  expect(await heroAction.evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(20);
 
   if (await page.getByRole("button", { name: "Switch to light mode" }).isVisible()) {
     await page.getByRole("button", { name: "Switch to light mode" }).click();
@@ -538,9 +543,24 @@ test("Concordium wallet login shows honest missing-wallet state, verifies real s
 
     // Without a Concordium wallet extension, clicking Connect shows an honest error (no fake login).
     await page.goto("/");
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("button", { name: "Connect Concordium wallet" }).click();
     await expect(page.getByTestId("wallet-auth-error")).toContainText("Concordium Browser Wallet not detected", { timeout: 6_000 });
-    await page.getByRole("button", { name: "Dismiss wallet message" }).click();
+    const toaster = page.locator("[data-sonner-toaster]");
+    await expect(toaster).toHaveAttribute("data-y-position", "bottom");
+    await expect(toaster).toHaveAttribute("data-x-position", "right");
+    await expect.poll(async () => {
+      const box = await page.getByTestId("wallet-auth-error").boundingBox();
+      return box ? 390 - (box.x + box.width) : -1;
+    }).toBeGreaterThanOrEqual(14);
+    await expect.poll(async () => {
+      const box = await page.getByTestId("wallet-auth-error").boundingBox();
+      return box ? 844 - (box.y + box.height) : -1;
+    }).toBeGreaterThanOrEqual(14);
+    await page.getByRole("button", { name: "Switch to dark mode" }).click();
+    await expect(toaster).toHaveAttribute("data-sonner-theme", "dark");
+    await page.getByRole("button", { name: "Close toast" }).click();
+    await page.setViewportSize({ width: 1280, height: 720 });
 
     // Inject a real Concordium provider bridge backed by our Node Ed25519 signer.
     await page.exposeFunction("__veripocSignConcordium", async (message: string) => {

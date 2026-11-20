@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Inbox, LogOut, ShieldCheck, SlidersHorizontal, Wallet } from "lucide-react";
+import { toast } from "sonner";
 
 type ProgramRole = "team" | "researcher";
 
@@ -34,6 +35,14 @@ export function AccountMenu() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error, { id: "wallet-auth-error", testId: "wallet-auth-error", duration: Infinity });
+    } else {
+      toast.dismiss("wallet-auth-error");
+    }
+  }, [error]);
 
   useEffect(() => {
     let active = true;
@@ -255,12 +264,6 @@ export function AccountMenu() {
               </div>
             </div>
           )}
-        </div>
-      )}
-      {error && (
-        <div className="account-alert verification-error" role="alert" data-testid="wallet-auth-error">
-          <span>{error}</span>
-          <button type="button" className="account-alert-close focus-ring" aria-label="Dismiss wallet message" onClick={() => setError(null)}>×</button>
         </div>
       )}
     </div>
