@@ -215,7 +215,7 @@ export function ReportWizard({ unlockAllSteps = false }: { unlockAllSteps?: bool
                 {copyStatus}
               </p>
               <p className="report-small-note">
-                Automated agent REST/MCP submission and signed requests are planned. This brief stays in your browser until you copy it.
+                A configured local API can verify signed requests from an invited agent. An automated REST/MCP gateway is planned. This brief stays in your browser until you copy it.
               </p>
               <div className="report-stage-actions">
                 <button type="button" className="report-secondary focus-ring" onClick={() => goTo(0)}>
