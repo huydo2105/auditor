@@ -1,0 +1,50 @@
+{
+  "id": "veripoc-vulnerable-contracts",
+  "name": "VeriPoC Vulnerable Contracts Lab",
+  "visibility": "private",
+  "depositCcd": 100,
+  "contacts": [
+    { "channel": "github", "value": "https://github.com/huydo2105/veripoc-vulnerable-contracts" },
+    { "channel": "x", "value": "https://x.com/veripoc" },
+    { "channel": "discord", "value": "https://discord.gg/veripoc" }
+  ],
+  "invitedAgentBadges": [
+    "JyP9UhUtd9AeJywDRsg5q"
+  ],
+  "sourceUrl": "https://github.com/huydo2105/veripoc-vulnerable-contracts",
+  "sourceRevision": "361349bae6c0b77bcdd7f66c2504063bbdab40a4",
+  "chain": "evm-local",
+  "runLimit": 10,
+  "permittedTargets": [
+    "contracts/ReentrancyVault.sol",
+    "contracts/ShareInflationVault.sol",
+    "contracts/FlashLoanOraclePool.sol"
+  ],
+  "instructions": "Investigate the three intentionally vulnerable Solidity contracts at the pinned commit for fund drainage, share-price manipulation, and undercollateralized borrowing. Run all experiments locally using Foundry.",
+  "invariants": "1. A depositor must never withdraw more ETH than their recorded balance in ReentrancyVault.\n2. Depositing assets into ShareInflationVault must never mint zero shares due to a prior donation.\n3. Borrowing from FlashLoanOraclePool must remain bounded by manipulation-resistant collateral valuation.",
+  "submissionFormat": "Include the affected contract path, pinned commit SHA (361349bae6c0b77bcdd7f66c2504063bbdab40a4), root cause, exact Foundry PoC command, expected vs. observed balances, and a minimal patch.",
+  "outOfScope": "Deploying these fixtures to any public mainnet or testnet, attacking third-party RPC infrastructure, social engineering, and gas-only optimizations.",
+  "policy": "Run all PoCs exclusively on a local Anvil/Foundry environment. Keep findings private to invited program members until triaged.",
+  "eligibility": "Reproducible Foundry PoCs demonstrating a broken invariant in one of the three in-scope contracts qualify for team review.",
+  "rewardCurrency": "USD",
+  "rewards": [
+    { "severity": "critical", "min": 10000, "max": 50000 },
+    { "severity": "high", "min": 2500, "max": 10000 },
+    { "severity": "medium", "min": 500, "max": 2500 }
+  ],
+  "docsUrl": "https://github.com/huydo2105/veripoc-vulnerable-contracts#readme",
+  "references": [
+    {
+      "kind": "source",
+      "name": "Vulnerable contracts repository",
+      "url": "https://github.com/huydo2105/veripoc-vulnerable-contracts/tree/361349bae6c0b77bcdd7f66c2504063bbdab40a4"
+    },
+    {
+      "kind": "documentation",
+      "name": "Fixture README and invariants",
+      "url": "https://github.com/huydo2105/veripoc-vulnerable-contracts/blob/361349bae6c0b77bcdd7f66c2504063bbdab40a4/README.md"
+    }
+  ],
+  "agentContext": "Compiler: solc 0.8.24 (foundry.toml). Clone https://github.com/huydo2105/veripoc-vulnerable-contracts at commit 361349bae6c0b77bcdd7f66c2504063bbdab40a4 and run `forge build` and `forge test -vvv` locally.",
+  "agentRules": "Operate strictly offline against local Foundry forks. Only inspect files under contracts/. Do not broadcast transactions to live networks or modify files outside the local test harness."
+}

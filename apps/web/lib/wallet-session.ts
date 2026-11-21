@@ -22,5 +22,8 @@ export async function ensureWalletSession(): Promise<WalletSession> {
   });
   const session = await verifyResponse.json();
   if (!verifyResponse.ok) throw new Error(session.error || "Wallet signature could not be verified.");
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("veripoc:session-changed", { detail: session }));
+  }
   return session;
 }

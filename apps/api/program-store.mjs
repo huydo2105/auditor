@@ -10,8 +10,24 @@ const unique = values => new Set(values).size === values.length;
 const severities = ["critical", "high", "medium", "low", "informational"];
 const emptyTiers = () => severities.map(severity => ({ severity, min: 0, max: 0 }));
 const optionalText = (value, max) => typeof value === "string" && value.length <= max;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const safeLink = value => typeof value === "string" && value.length <= 300
   && (/^https:\/\/[^\s]+$/.test(value) || /^0x[a-fA-F0-9]{40}$/.test(value));
+const validContactEntry = entry => {
+  const trimmed = entry.trim();
+  if (!trimmed) return false;
+  if (emailPattern.test(trimmed) || /^https:\/\/[^\s]+$/.test(trimmed)) return true;
+  const match = /^(email|x|linkedin|discord|telegram|github|website):\s*(.+)$/i.exec(trimmed);
+  if (!match) return false;
+  const [, channel, target] = match;
+  return channel.toLowerCase() === "email" ? emailPattern.test(target) : /^https:\/\/[^\s]+$/.test(target);
+};
+const validContact = value => {
+  if (!optionalText(value, 600)) return false;
+  if (!value.trim()) return true;
+  const entries = value.split(/\s*\|\s*/);
+  return entries.length <= 6 && entries.every(validContactEntry);
+};
 
 export function validateProgramDraft(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)
@@ -22,7 +38,7 @@ export function validateProgramDraft(body) {
     || !text(body.sourceUrl, 300) || !/^https:\/\/[^\s]+$/.test(body.sourceUrl)
     || !["evm-local", "evm-testnet", "solana-testnet"].includes(body.chain)
     || body.confidentiality !== "members-only" || !["private", "public"].includes(body.visibility)
-    || !optionalText(body.contact, 200) || (body.contact && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.contact))
+    || !validContact(body.contact)
     || !optionalText(body.docsUrl, 300) || (body.docsUrl && !safeLink(body.docsUrl))
     || !optionalText(body.agentContext, 2000) || !text(body.rules, 2000)
     || !text(body.exclusions, 2000) || !Number.isInteger(body.runLimit)

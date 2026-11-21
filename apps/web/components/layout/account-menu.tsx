@@ -53,7 +53,47 @@ export function AccountMenu() {
         if (active && data?.authenticated && typeof data.account === "string") setSession(data);
       })
       .catch(() => {});
-    return () => { active = false; };
+
+    let cleanupWallet: (() => void) | undefined;
+    import("@concordium/browser-wallet-api-helpers")
+      .then(({ detectConcordiumProvider }) => detectConcordiumProvider(1500))
+      .then(async provider => {
+        if (!active) return;
+        if (typeof provider.getMostRecentlySelectedAccount === "function") {
+          const existing = await provider.getMostRecentlySelectedAccount().catch(() => undefined);
+          if (active && existing) setWalletAccount(existing);
+        }
+        const onAccountChanged = (nextAccount: string) => {
+          if (active) setWalletAccount(nextAccount || null);
+        };
+        const onAccountDisconnected = () => {
+          if (active) setWalletAccount(null);
+        };
+        if (typeof provider.on === "function") {
+          provider.on("accountChanged", onAccountChanged);
+          provider.on("accountDisconnected", onAccountDisconnected);
+          cleanupWallet = () => {
+            provider.removeListener?.("accountChanged", onAccountChanged);
+            provider.removeListener?.("accountDisconnected", onAccountDisconnected);
+          };
+        }
+      })
+      .catch(() => {});
+
+    const onSessionChanged = (event: Event) => {
+      const detail = (event as CustomEvent<WalletSession | null>).detail;
+      if (active && detail?.authenticated && typeof detail.account === "string") {
+        setSession(detail);
+        setWalletAccount(detail.account);
+      }
+    };
+    window.addEventListener("veripoc:session-changed", onSessionChanged);
+
+    return () => {
+      active = false;
+      cleanupWallet?.();
+      window.removeEventListener("veripoc:session-changed", onSessionChanged);
+    };
   }, []);
 
   useEffect(() => {
@@ -152,6 +192,7 @@ export function AccountMenu() {
         return;
       }
       setSession(null);
+      setWalletAccount(null);
       setMenuOpen(false);
     } catch {
       setError("Could not sign out. Your VeriPoC session is still active.");
