@@ -308,7 +308,7 @@ test("team draft wizard previews locally and shows saved state only after API su
   await expect(page.getByRole("heading", { name: "Create a bug bounty project" })).toBeVisible();
   await expect(page.getByText("Team workspace preview")).toHaveCount(0);
   await page.getByRole("textbox", { name: /Project name/ }).fill("Sample vault review");
-  await page.getByRole("textbox", { name: /Team contact/ }).fill("team@example.org");
+  await page.getByRole("textbox", { name: /Contact value 1/ }).fill("team@example.org");
   await page.getByRole("button", { name: /Continue/ }).click();
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).toContainText("Sample vault review");
   await page.getByRole("button", { name: "Help for System overview and investigation goals" }).focus();
@@ -326,7 +326,6 @@ test("team draft wizard previews locally and shows saved state only after API su
   await page.getByRole("textbox", { name: "Name", exact: true }).fill("Vault library");
   await page.getByRole("textbox", { name: /HTTPS link or address/ }).fill("https://github.com/example/library");
   await page.getByRole("navigation", { name: "Draft sections" }).getByRole("button", { name: /Agent setup/ }).click();
-  await page.getByRole("button", { name: /Preview unsaved draft/ }).click();
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).toContainText("Sample vault review");
   expect(posts).toEqual([]);
   const id = "11111111-1111-4111-8111-111111111111";
@@ -347,7 +346,6 @@ test("team draft wizard previews locally and shows saved state only after API su
   expect(posts).toHaveLength(2);
   expect(posts.every(url => url.endsWith("/v1/programs/agent-setup"))).toBe(true);
   await page.getByRole("textbox", { name: /Agent permissions and tool limits/ }).fill("Stay within the authorized source.");
-  await page.getByRole("button", { name: /Preview unsaved draft/ }).click();
   await page.route("**/v1/auth/me", route => route.fulfill({ status: 200, contentType: "application/json",
     body: JSON.stringify({ authenticated: true, account: "test-owner", csrfToken: "csrf" }) }));
   await page.route("**/v1/programs", async route => {
@@ -359,7 +357,7 @@ test("team draft wizard previews locally and shows saved state only after API su
     expect(body.references).toHaveLength(1);
     await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ program: { id } }) });
   });
-  await page.getByRole("button", { name: "Publish authorized program" }).click();
+  await page.getByRole("button", { name: "Create bounty" }).click();
   await expect(page.getByRole("link", { name: "Open saved program" })).toHaveAttribute("href", `/programs/${id}`);
   await page.reload();
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).not.toContainText("Sample vault review");

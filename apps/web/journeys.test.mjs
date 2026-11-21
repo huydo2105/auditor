@@ -88,7 +88,7 @@ test("team wizard previews locally and has a final editable agent setup", () => 
   assert.match(draft, /Unsaved local preview/);
   for (const section of ["Instructions", "Agent setup", "Scope", "Exclusions", "Rewards", "Links"]) assert.match(draft, new RegExp(section));
   assert.match(draft, /role="tooltip"/);
-  assert.match(draft, /Preview unsaved draft/);
+  assert.match(draft, /Create bounty/);
   assert.match(draft, /Generate with AI/);
   assert.doesNotMatch(draft, /localStorage|type="file"/);
 });

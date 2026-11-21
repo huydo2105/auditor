@@ -362,7 +362,11 @@ export function ProgramDraft() {
             {current.title === "Links" && <div className="reference-editor"><h3>Additional references</h3><p>Use named rows for source repositories, documentation, or deployed addresses.</p>{references.map((reference, index) => <div key={index} className="reference-row"><label>Type<select value={reference.kind} onChange={event => referenceChanged(index, "kind", event.target.value as ReferenceInput["kind"])}><option value="source">Source</option><option value="documentation">Documentation</option><option value="deployment">Deployment</option></select></label><label>Name<input value={reference.name} onChange={event => referenceChanged(index, "name", event.target.value)} maxLength={100} required /></label><label>HTTPS link or address<input value={reference.url} onChange={event => referenceChanged(index, "url", event.target.value)} maxLength={300} required /></label><button type="button" className="reference-remove focus-ring" aria-label={`Remove reference ${index + 1}`} onClick={() => { setReferences(items => items.filter((_, i) => i !== index)); setReviewed(false); setSavedId(null); }}><Trash2 size={16} aria-hidden="true" /></button></div>)}<button type="button" className="draft-back reference-add focus-ring" disabled={references.length >= 12} onClick={() => { setReferences(items => [...items, { kind: "source", name: "", url: "" }]); setReviewed(false); setSavedId(null); }}><Plus size={16} aria-hidden="true" /> Add reference</button></div>}
             <div className="draft-actions">
               {step > 0 ? <button type="button" className="draft-back focus-ring" onClick={() => setStep(step - 1)}>Previous</button> : <span />}
-              <button type="submit" className="site-action site-action-dark focus-ring">{step === steps.length - 1 ? "Preview unsaved draft" : "Continue"} <ArrowRight size={16} aria-hidden="true" /></button>
+              {step < steps.length - 1 && (
+                <button type="submit" className="site-action site-action-dark focus-ring">
+                  Continue <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              )}
             </div>
           </form>
         </div>
