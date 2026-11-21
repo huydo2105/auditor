@@ -366,13 +366,22 @@ test("team draft wizard previews locally and shows saved state only after API su
 });
 
 test("profile has projects and findings without exposing private programs to visitors", async ({ page }) => {
+  await page.route("**/v1/auth/me", route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ authenticated: false }) }));
   await page.goto("/profile/projects");
   await expect(page.getByRole("navigation", { name: "Profile sections" }).getByRole("link")).toHaveCount(2);
-  await expect(page.getByRole("link", { name: "Our projects" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("button", { name: "Sign with Concordium to view programs" })).toBeVisible();
-  await page.getByRole("link", { name: "Our findings" }).click();
+  await expect(page.getByRole("link", { name: "Projects", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("tab", { name: "Owned" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("table", { name: "Owned projects" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create Program" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign with Concordium" })).toBeVisible();
+  await expect(page.getByText("My programs")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Invited" }).click();
+  await expect(page.getByRole("table", { name: "Invited projects" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create Program" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Findings", exact: true }).click();
   await expect(page).toHaveURL(/\/profile\/findings$/);
-  await expect(page.getByRole("link", { name: "Our findings" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Findings", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
 test("owner can sign into profile and revisit saved programs", async ({ page }) => {
@@ -399,11 +408,17 @@ test("owner can sign into profile and revisit saved programs", async ({ page }) 
       chain: "evm-local", permittedTargets: ["src/Vault.sol"], rules: "Review the vault", exclusions: "Other targets",
       runLimit: 2 }] } : { error: "team account required" }) }));
   await page.route("**/v1/programs/invited", route => route.fulfill({ status: signedIn ? 200 : 401,
-    contentType: "application/json", body: JSON.stringify(signedIn ? { programs: [] } : { error: "wallet session required" }) }));
+    contentType: "application/json", body: JSON.stringify(signedIn ? { programs: [{ id: "22222222-2222-2222-2222-222222222222",
+      name: "Invited review", ownerAccount: "other-team", status: "active", visibility: "private",
+      verification: "not-configured", sourceRevision: "b".repeat(40), chain: "evm-local" }] } : { error: "wallet session required" }) }));
   await page.goto("/profile/projects");
-  await page.getByRole("button", { name: "Sign with Concordium to view programs" }).click();
-  await expect(page.getByRole("heading", { name: "Saved vault" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open program" })).toHaveAttribute("href", "/programs/11111111-1111-1111-1111-111111111111");
+  await page.getByRole("button", { name: "Sign with Concordium" }).click();
+  await expect(page.getByRole("table", { name: "Owned projects" })).toContainText("Saved vault");
+  await expect(page.getByRole("table", { name: "Owned projects" })).not.toContainText("Invited review");
+  await expect(page.getByRole("link", { name: "Open Saved vault" })).toHaveAttribute("href", "/programs/11111111-1111-1111-1111-111111111111");
+  await page.getByRole("tab", { name: "Invited" }).click();
+  await expect(page.getByRole("table", { name: "Invited projects" })).toContainText("Invited review");
+  await expect(page.getByRole("table", { name: "Invited projects" })).not.toContainText("Saved vault");
 });
 
 test("legacy /verify operator console remains available", async ({ page }) => {

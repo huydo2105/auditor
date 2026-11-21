@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ensureWalletSession } from "@/lib/wallet-session";
+import { SEVERITY_META } from "@/components/journeys/program-draft";
+
+const severityColor = Object.fromEntries(SEVERITY_META.map(item => [item.id, item.color]));
+const severityLabel = Object.fromEntries(SEVERITY_META.map(item => [item.id, item.label]));
 
 type Program = { id: string; name: string; ownerAccount: string; sourceUrl: string; sourceRevision: string;
   chain: string; status: string; verification: string; permittedTargets: string[]; rules: string;
@@ -29,7 +33,7 @@ export function SavedPrograms({ id, embedded = false }: { id?: string; embedded?
       .then(async response => ({ ok: response.ok, data: await response.json() }))))
       .then(results => {
         if (!active) return;
-        if (results.every(result => !result.ok)) { setError("Sign into an authorized account to view private programs."); return; }
+        if (results.every(result => !result.ok)) { setError("Program not found or access not granted."); return; }
         setPrograms(results.flatMap(result => result.ok ? (id ? [result.data.program] : result.data.programs) : []));
       }).catch(() => { if (active) setError("The program API is unavailable."); })
       .finally(() => { if (active) setLoading(false); });
@@ -62,7 +66,7 @@ export function SavedPrograms({ id, embedded = false }: { id?: string; embedded?
     finally { setBusy(false); }
   }
   const content = <>
-    {!embedded && <div className="section-head"><h1>{id ? "Authorized program" : "My projects"}</h1><p>Private scope for the owner and invited researchers. Verification and report intake are not yet configured for newly created programs.</p></div>}
+    {!embedded && <div className="section-head"><h1>{id ? "Authorized program" : "Projects"}</h1></div>}
     {error && <p role="alert">{error}</p>}
     {!session && !loading && programs.length === 0 && <button type="button" className="site-action site-action-dark focus-ring" disabled={busy} onClick={signIn}>{busy ? "Signing in…" : "Sign with Concordium to view programs"}</button>}
     {loading && <p role="status">Loading private programs…</p>}
@@ -78,7 +82,7 @@ export function SavedPrograms({ id, embedded = false }: { id?: string; embedded?
         <div><dt>Rules</dt><dd className="whitespace-pre-wrap">{program.rules}</dd></div>
         <div><dt>Exclusions</dt><dd>{program.exclusions}</dd></div>
         {program.agentContext && <div><dt>Agent setup</dt><dd>{program.agentContext}</dd></div>}
-        <div><dt>Proposed reward ranges</dt><dd>{program.rewardTiers?.map(tier => `${tier.severity}: $${tier.min}–$${tier.max}`).join(" · ") || "No reward policy"} · Team decision required</dd></div>
+        <div><dt>Proposed reward ranges</dt><dd className="reward-preview-list">{program.rewardTiers?.filter(tier => tier.max > 0 || tier.min > 0).length ? program.rewardTiers.filter(tier => tier.max > 0 || tier.min > 0).map(tier => <span key={tier.severity} className="reward-preview-item"><span className="severity-dot" style={{ backgroundColor: severityColor[tier.severity] ?? "#8B0000" }} aria-hidden="true" />{severityLabel[tier.severity] ?? tier.severity}: ${tier.min}–${tier.max}</span>) : "No reward policy"}</dd></div>
         <div><dt>Additional references</dt><dd>{program.references?.length ? program.references.map(item => <p key={`${item.kind}:${item.url}`}>{item.name} · {item.kind}: {item.url.startsWith("https://") ? <a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a> : item.url}</p>) : "None"}</dd></div>
         <div><dt>Run limit</dt><dd>{program.runLimit}</dd></div>
         {program.visibility === "private" && <div><dt>Invited researcher accounts</dt><dd>{program.invitedResearcherAccounts?.length ?? 0}</dd></div>}
