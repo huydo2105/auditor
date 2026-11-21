@@ -94,15 +94,6 @@ export function WorkflowVideoCard({
             aria-label={ariaLabel}
           />
         )}
-        <button
-          type="button"
-          className="workflow-video-replay focus-ring"
-          onClick={restartMedia}
-          aria-label={replayLabel}
-        >
-          <RotateCcw size={15} aria-hidden="true" />
-          <span>Replay</span>
-        </button>
       </div>
     </div>
   );
