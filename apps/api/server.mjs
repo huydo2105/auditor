@@ -50,6 +50,25 @@ async function readRawBody(req, maxSize = 4096) {
   req.rawBody = Buffer.concat(chunks);
   return req.rawBody;
 }
+function validStructuredReport(report) {
+  if (!report || typeof report !== "object" || Array.isArray(report)) return false;
+  const required = ["title", "location", "rootCause", "impact", "invariant", "reproduction"];
+  const allowed = new Set([...required, "tools"]);
+  const keys = Object.keys(report);
+  if (keys.some(key => !allowed.has(key))) return false;
+  for (const key of required) {
+    if (typeof report[key] !== "string" || !report[key].trim() || report[key].trim().length > 600) return false;
+  }
+  if (report.tools !== undefined && (typeof report.tools !== "string" || report.tools.trim().length > 200)) return false;
+  return true;
+}
+function validSubmissionBody(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+  const keys = Object.keys(body).sort().join();
+  if (keys !== "claim,targetSha256" && keys !== "claim,report,targetSha256") return false;
+  if (body.claim !== "donation-share-inflation" || body.targetSha256 !== DEMO_PROGRAM.targetSha256) return false;
+  return body.report === undefined || validStructuredReport(body.report);
+}
 function validBody(kind, body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return false;
   const keys = Object.keys(body).sort().join();
@@ -329,6 +348,25 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
           return json(res, 200, { id: job.id, programId: job.programId, submissionId: job.submissionId,
             actorId: job.authorId, kind: job.kind, state: job.state, fixture: job.body.fixture, result: job.result });
         }
+        if (req.method === "GET" && segments.length === 4 && segments[1] === "jobs" && segments[3] === "evidence") {
+          const job = jobs.get(segments[2]);
+          if (!job || job.programId !== DEMO_PROGRAM.id || (actor.role !== "team" && job.authorId !== actor.id))
+            return json(res, 404, { error: "job not found" });
+          if (job.state !== "finished" || !job.result)
+            return json(res, 409, { error: "verification job has not finished yet", state: job.state });
+          const submission = submissions.get(job.submissionId);
+          return json(res, 200, {
+            jobId: job.id,
+            programId: job.programId,
+            submissionId: job.submissionId,
+            actorId: job.authorId,
+            fixture: job.body.fixture,
+            claim: submission?.claim ?? null,
+            targetSha256: submission?.targetSha256 ?? DEMO_PROGRAM.targetSha256,
+            verdict: job.result.status,
+            evidence: job.result,
+          });
+        }
         if (req.method !== "POST") return json(res, 404, { error: "not found" });
         if (actor.role !== "researcher") return json(res, 403, { error: "researcher role required" });
         if (!fixtureRevisionMatches()) return json(res, 409, { error: "reviewed fixture revision changed" });
@@ -348,14 +386,21 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
         if (prior) return prior.fingerprint === fingerprint ? json(res, isSubmission ? 201 : 202,
           isSubmission ? submissions.get(prior.id) : { id: prior.id, state: jobs.get(prior.id).state })
           : json(res, 409, { error: "idempotency key reused for a different request" });
-        if (isSubmission && (!body || typeof body !== "object" || Array.isArray(body)
-          || Object.keys(body).sort().join() !== "claim,targetSha256"
-          || body.claim !== "donation-share-inflation" || body.targetSha256 !== DEMO_PROGRAM.targetSha256))
-          throw fail(400, "only the reviewed vault claim and target revision are accepted");
+        if (isSubmission && !validSubmissionBody(body))
+          throw fail(400, "only the reviewed vault claim, target revision, and valid structured report are accepted");
         if (isRun && !validBody("verify", body)) throw fail(400, "only reviewed repository fixtures are accepted");
         if (isSubmission) {
+          const report = body.report ? {
+            title: body.report.title.trim(),
+            location: body.report.location.trim(),
+            rootCause: body.report.rootCause.trim(),
+            impact: body.report.impact.trim(),
+            invariant: body.report.invariant.trim(),
+            reproduction: body.report.reproduction.trim(),
+            ...(body.report.tools?.trim() ? { tools: body.report.tools.trim() } : {}),
+          } : undefined;
           const item = { id: randomUUID(), programId: DEMO_PROGRAM.id, authorId: actor.id,
-            claim: body.claim, targetSha256: body.targetSha256, jobIds: [] };
+            claim: body.claim, targetSha256: body.targetSha256, ...(report ? { report } : {}), jobIds: [] };
           submissions.set(item.id, item);
           idempotency.set(scopedKey, { fingerprint, id: item.id });
           return json(res, 201, item);
