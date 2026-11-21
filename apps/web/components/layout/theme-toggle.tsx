@@ -31,8 +31,14 @@ export function ThemeToggle() {
     window.dispatchEvent(new Event(eventName));
   }
 
-  return <div className="theme-switch" role="group" aria-label="Color theme">
-    <button type="button" className="focus-ring" onClick={() => select("light")} aria-pressed={theme === "light"}><Sun size={14} aria-hidden="true" /> Paper</button>
-    <button type="button" className="focus-ring" onClick={() => select("dark")} aria-pressed={theme === "dark"}><Moon size={14} aria-hidden="true" /> Charcoal</button>
-  </div>;
+  const dark = theme === "dark";
+  return <button
+    type="button"
+    className="theme-switch focus-ring"
+    onClick={() => select(dark ? "light" : "dark")}
+    aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+    title={dark ? "Switch to light mode" : "Switch to dark mode"}
+  >
+    {dark ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}
+  </button>;
 }

@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
+import { AccountAddress, buildBasicAccountSigner, signMessage } from "@concordium/web-sdk";
 import { createApiServer } from "../../api/server.mjs";
 import { GET, POST } from "../app/v1/[...segments]/route";
 
@@ -44,6 +46,76 @@ test("same-origin proxy forwards only allowed verification requests and backend 
     }), context("programs", "demo-vault", "submissions"));
     assert.equal(submitted.status, 201);
     assert.equal((await POST(request("vulnerable", researcherToken, "role-legacy-key"), context("verify-poc"))).status, 401);
+  } finally {
+    if (oldOrigin === undefined) delete process.env.VERIPOC_API_ORIGIN;
+    else process.env.VERIPOC_API_ORIGIN = oldOrigin;
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+test("same-origin proxy forwards Concordium wallet auth, session cookies, and CSRF headers", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const pubDer = publicKey.export({ format: "der", type: "spki" });
+  const privDer = privateKey.export({ format: "der", type: "pkcs8" });
+  const publicKeyHex = pubDer.subarray(pubDer.length - 32).toString("hex");
+  const privateKeyHex = privDer.subarray(privDer.length - 32).toString("hex");
+  const address = AccountAddress.fromBuffer(new Uint8Array(32).fill(0x44).buffer);
+  const signer = buildBasicAccountSigner(privateKeyHex);
+  const accountInfo = {
+    accountAddress: address,
+    accountThreshold: 1,
+    accountCredentials: {
+      0: { value: { contents: { credentialPublicKeys: { keys: { 0: { verifyKey: publicKeyHex, schemeId: "Ed25519" } }, threshold: 1 } } } },
+    },
+  };
+  const serverOptions = {
+    token,
+    teamToken,
+    researcherToken,
+    teamAccounts: [address.address],
+    lookupAccountInfo: async (acc: string) => {
+      if (acc !== address.address) throw new Error("not found");
+      return accountInfo;
+    },
+    execute: async () => ({ status: "tool_error", reason: "test executor" }),
+  };
+  const server = createApiServer(serverOptions as unknown as Parameters<typeof createApiServer>[0]);
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const oldOrigin = process.env.VERIPOC_API_ORIGIN;
+  process.env.VERIPOC_API_ORIGIN = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  try {
+    const origin = "http://localhost:3000";
+    const challengeRes = await POST(new Request(`${origin}/v1/auth/concordium/challenge`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ account: address.address }),
+    }), context("auth", "concordium", "challenge"));
+    assert.equal(challengeRes.status, 200);
+    const challenge = await challengeRes.json();
+    const signature = await signMessage(address, challenge.message, signer);
+
+    const verifyRes = await POST(new Request(`${origin}/v1/auth/concordium/verify`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin },
+      body: JSON.stringify({ challengeId: challenge.challengeId, account: address.address, signature }),
+    }), context("auth", "concordium", "verify"));
+    assert.equal(verifyRes.status, 200);
+    const setCookie = verifyRes.headers.get("set-cookie");
+    assert.ok(setCookie && /HttpOnly/.test(setCookie) && /SameSite=Lax/.test(setCookie));
+    const verified = await verifyRes.json();
+    assert.equal(verified.programRoles["demo-vault"], "team");
+    const cookie = setCookie.split(";")[0];
+
+    const meRes = await GET(new Request(`${origin}/v1/auth/me`, { headers: { cookie } }), context("auth", "me"));
+    assert.equal(meRes.status, 200);
+    assert.equal((await meRes.json()).account, address.address);
+
+    const logoutRes = await POST(new Request(`${origin}/v1/auth/logout`, {
+      method: "POST",
+      headers: { cookie, origin, "x-veripoc-csrf": verified.csrfToken },
+    }), context("auth", "logout"));
+    assert.equal(logoutRes.status, 200);
+    assert.match(logoutRes.headers.get("set-cookie") ?? "", /Max-Age=0/);
   } finally {
     if (oldOrigin === undefined) delete process.env.VERIPOC_API_ORIGIN;
     else process.env.VERIPOC_API_ORIGIN = oldOrigin;

@@ -1,4 +1,6 @@
+import { generateKeyPairSync } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { AccountAddress, buildBasicAccountSigner, signMessage } from "@concordium/web-sdk";
 import { createApiServer } from "../../../api/server.mjs";
 import { DEMO_PROGRAM } from "../../../api/program.mjs";
 
@@ -11,12 +13,19 @@ test("brand mark keeps its accessible home link and adapts to both themes", asyn
   const box = await brand.boundingBox();
   expect(box?.width).toBeGreaterThanOrEqual(44);
   expect(box?.height).toBeGreaterThanOrEqual(44);
+  const heroAction = page.getByRole("link", { name: "Get started" });
+  const actionBox = await heroAction.boundingBox();
+  expect(actionBox?.width).toBeGreaterThanOrEqual(260);
+  expect(actionBox?.height).toBeGreaterThanOrEqual(72);
+  expect(await heroAction.evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(20);
 
-  await page.getByRole("button", { name: "Paper" }).click();
+  if (await page.getByRole("button", { name: "Switch to light mode" }).isVisible()) {
+    await page.getByRole("button", { name: "Switch to light mode" }).click();
+  }
   await expect.poll(() => page.locator("body").evaluate(body => getComputedStyle(body).backgroundColor)).toBe("rgb(246, 245, 242)");
   const lightStroke = await brand.locator("path").first().evaluate(path => getComputedStyle(path).stroke);
   await page.screenshot({ path: testInfo.outputPath("brand-light-1440.png"), fullPage: false });
-  await page.getByRole("button", { name: "Charcoal" }).click();
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
   await expect.poll(() => page.locator("body").evaluate(body => getComputedStyle(body).backgroundColor)).toBe("rgb(20, 20, 20)");
   const darkStroke = await brand.locator("path").first().evaluate(path => getComputedStyle(path).stroke);
   expect(lightStroke).not.toBe(darkStroke);
@@ -24,7 +33,12 @@ test("brand mark keeps its accessible home link and adapts to both themes", asyn
   await brand.focus();
   await expect(brand).toBeFocused();
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "Connect Concordium wallet" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Opportunities" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.screenshot({ path: testInfo.outputPath("brand-dark-390.png"), fullPage: false });
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   const favicon = await page.request.get("/brand/veripoc-app-icon.svg");
   expect(favicon.ok()).toBe(true);
   expect(await favicon.text()).toContain("#ee9077");
@@ -468,6 +482,147 @@ test("Demo Vault wizard runs invited researcher verification and shows private e
     } finally {
       await teamContext.close();
     }
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
+test("Concordium wallet login shows honest missing-wallet state, verifies real signature, displays API role, and signs out", async ({ browser, baseURL }) => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const pubDer = publicKey.export({ format: "der", type: "spki" });
+  const privDer = privateKey.export({ format: "der", type: "pkcs8" });
+  const publicKeyHex = pubDer.subarray(pubDer.length - 32).toString("hex");
+  const privateKeyHex = privDer.subarray(privDer.length - 32).toString("hex");
+  const address = AccountAddress.fromBuffer(new Uint8Array(32).fill(0x55).buffer);
+  const signer = buildBasicAccountSigner(privateKeyHex);
+  const accountInfo = {
+    accountAddress: address,
+    accountThreshold: 1,
+    accountCredentials: {
+      0: { value: { contents: { credentialPublicKeys: { keys: { 0: { verifyKey: publicKeyHex, schemeId: "Ed25519" } }, threshold: 1 } } } },
+    },
+  };
+
+  const serverOptions = {
+    token: "e2e-wallet-operator-token-with-thirty-two-chars-ok",
+    teamToken: "e2e-wallet-team-token-with-at-least-thirty-two-chars",
+    researcherToken: "e2e-wallet-researcher-token-with-thirty-two-chars-ok",
+    teamAccounts: [address.address],
+    lookupAccountInfo: async (acc: string) => {
+      if (acc !== address.address) throw new Error("not found");
+      return accountInfo;
+    },
+    execute: async () => ({ status: "tool_error", reason: "unused" }),
+  };
+  const server = createApiServer(serverOptions as unknown as Parameters<typeof createApiServer>[0]);
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const apiOrigin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+
+  try {
+    const context = await browser.newContext({ baseURL });
+    const page = await context.newPage();
+    let challengeRequests = 0;
+    page.on("request", request => {
+      if (new URL(request.url()).pathname === "/v1/auth/concordium/challenge") challengeRequests++;
+    });
+    await page.route("**/v1/auth/**", async route => {
+      const req = route.request();
+      const url = new URL(req.url());
+      const headers: Record<string, string> = {};
+      for (const name of ["content-type", "cookie", "origin", "x-veripoc-csrf"]) {
+        const value = req.headers()[name];
+        if (value) headers[name] = value;
+      }
+      if (!headers.origin) headers.origin = url.origin;
+      const upstream = await fetch(`${apiOrigin}${url.pathname}`, {
+        method: req.method(),
+        headers,
+        body: req.postData() ?? undefined,
+      });
+      const responseHeaders: Record<string, string> = { "content-type": "application/json; charset=utf-8" };
+      const setCookie = upstream.headers.get("set-cookie");
+      if (setCookie) responseHeaders["set-cookie"] = setCookie;
+      await route.fulfill({ status: upstream.status, headers: responseHeaders, body: await upstream.text() });
+    });
+
+    // Without a Concordium wallet extension, clicking Connect shows an honest error (no fake login).
+    await page.goto("/");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Connect Concordium wallet" }).click();
+    await expect(page.getByTestId("wallet-auth-error")).toContainText("Concordium Browser Wallet not detected", { timeout: 6_000 });
+    const toaster = page.locator("[data-sonner-toaster]");
+    await expect(toaster).toHaveAttribute("data-y-position", "bottom");
+    await expect(toaster).toHaveAttribute("data-x-position", "right");
+    await expect.poll(async () => {
+      const box = await page.getByTestId("wallet-auth-error").boundingBox();
+      return box ? 390 - (box.x + box.width) : -1;
+    }).toBeGreaterThanOrEqual(14);
+    await expect.poll(async () => {
+      const box = await page.getByTestId("wallet-auth-error").boundingBox();
+      return box ? 844 - (box.y + box.height) : -1;
+    }).toBeGreaterThanOrEqual(14);
+    await page.getByRole("button", { name: "Switch to dark mode" }).click();
+    await expect(toaster).toHaveAttribute("data-sonner-theme", "dark");
+    await page.getByRole("button", { name: "Close toast" }).click();
+
+    // Inject a real Concordium provider bridge backed by our Node Ed25519 signer.
+    await page.exposeFunction("__veripocSignConcordium", async (message: string) => {
+      return signMessage(address, message, signer);
+    });
+    await page.addInitScript((acct: string) => {
+      (window as unknown as Record<string, unknown>).concordium = {
+        requestAccounts: async () => [acct],
+        connect: async () => acct,
+        signMessage: async (_account: string, message: string) =>
+          (window as unknown as { __veripocSignConcordium: (m: string) => Promise<unknown> }).__veripocSignConcordium(message),
+      };
+    }, address.address);
+
+    await page.route("**/v1/auth/concordium/challenge", route => route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "verification API is unavailable" }),
+    }));
+    await page.reload();
+    await page.getByRole("button", { name: "Connect Concordium wallet" }).click();
+    await expect(page.getByRole("button", { name: /Connected wallet .*not signed in/ })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    expect(challengeRequests).toBe(0);
+    await expect(page.getByRole("link", { name: "Program inbox" })).toHaveCount(0);
+    await page.getByRole("button", { name: /Connected wallet .*not signed in/ }).click();
+    await expect(page.getByTestId("wallet-only-account")).toContainText(address.address.slice(0, 6));
+    await page.getByRole("button", { name: "Sign in to VeriPoC" }).click();
+    await expect(page.getByTestId("wallet-auth-error")).toContainText("VeriPoC sign-in is unavailable. Your wallet remains connected.");
+    await expect(page.getByRole("button", { name: /Connected wallet .*not signed in/ })).toBeVisible();
+    await page.unroute("**/v1/auth/concordium/challenge");
+    await page.getByRole("button", { name: "Sign in to VeriPoC" }).click();
+
+    // Only the server-verified sign-in grants an inbox link and server-derived Team role.
+    await expect(page.getByRole("link", { name: "Program inbox" })).toBeVisible();
+    await page.getByRole("button", { name: /Account menu for/ }).click();
+    await expect(page.getByTestId("connected-account")).toContainText(address.address.slice(0, 6));
+    await expect(page.getByTestId("connected-role")).toContainText("Demo Vault · Team");
+
+    // No session token leaked into URL or browser storage.
+    const storageDump = await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }));
+    expect(page.url()).not.toContain(address.address);
+    expect(storageDump).not.toContain("veripoc_session");
+
+    // An unavailable logout must not claim the server session was revoked.
+    await page.route("**/v1/auth/logout", route => route.fulfill({ status: 503, body: "{}" }));
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page.getByTestId("wallet-auth-error")).toContainText("session is still active");
+    await expect(page.getByRole("link", { name: "Program inbox" })).toBeVisible();
+    await page.unroute("**/v1/auth/logout");
+
+    // Successful sign out revokes the session but leaves the independently connected wallet visible.
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page.getByRole("button", { name: /Connected wallet .*not signed in/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Program inbox" })).toHaveCount(0);
+    await page.getByRole("button", { name: /Connected wallet .*not signed in/ }).click();
+    await page.getByRole("button", { name: "Forget wallet" }).click();
+    await expect(page.getByRole("button", { name: "Connect Concordium wallet" })).toBeVisible();
+    await context.close();
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
