@@ -301,27 +301,122 @@ test("public scope remains readable without JavaScript", async ({ browser, baseU
   } finally { await context.close(); }
 });
 
-test("team draft wizard keeps fields locally and never submits a program", async ({ page }) => {
+test("team draft wizard previews locally and shows saved state only after API success", async ({ page }) => {
   const posts: string[] = [];
   page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
   await page.goto("/teams/new");
-  await expect(page.getByRole("heading", { name: "Draft a bug bounty project" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create a bug bounty project" })).toBeVisible();
   await expect(page.getByText("Team workspace preview")).toHaveCount(0);
   await page.getByRole("textbox", { name: /Project name/ }).fill("Sample vault review");
+  await page.getByRole("textbox", { name: /Contact value 1/ }).fill("team@example.org");
   await page.getByRole("button", { name: /Continue/ }).click();
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).toContainText("Sample vault review");
   await page.getByRole("button", { name: "Help for System overview and investigation goals" }).focus();
   await expect(page.getByRole("tooltip")).toContainText("Describe assets, trust boundaries");
   await page.getByRole("textbox", { name: /System overview and investigation goals/ }).fill("Review share accounting and record a PoC.");
   await page.getByRole("navigation", { name: "Draft sections" }).getByRole("button", { name: /Scope/ }).click();
-  await page.getByRole("textbox", { name: /Target contract and immutable revision/ }).fill("Vault.sol at commit abc123");
-  await page.getByRole("textbox", { name: /Permitted testing scope/ }).fill("Local fixture only");
+  await page.getByRole("textbox", { name: /Primary source repository URL/ }).fill("https://github.com/example/vault");
+  await page.getByRole("textbox", { name: /Pinned source commit or digest/ }).fill("a".repeat(40));
+  await page.getByRole("textbox", { name: /Permitted contract paths/ }).fill("contracts/Vault.sol");
+  await page.getByRole("combobox", { name: /Chain and test environment/ }).selectOption("evm-local");
+  await page.getByRole("spinbutton", { name: /Verification run limit/ }).fill("2");
   await page.getByRole("navigation", { name: "Draft sections" }).getByRole("button", { name: /Links/ }).click();
-  await page.getByRole("button", { name: /Preview unsaved draft/ }).click();
+  await page.getByRole("textbox", { name: /Technical documentation URL/ }).fill("https://docs.example.org/vault");
+  await page.getByRole("button", { name: "Add reference" }).click();
+  await page.getByRole("textbox", { name: "Name", exact: true }).fill("Vault library");
+  await page.getByRole("textbox", { name: /HTTPS link or address/ }).fill("https://github.com/example/library");
+  await page.getByRole("navigation", { name: "Draft sections" }).getByRole("button", { name: /Agent setup/ }).click();
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).toContainText("Sample vault review");
   expect(posts).toEqual([]);
+  const id = "11111111-1111-4111-8111-111111111111";
+  await page.route("**/v1/programs/agent-setup", async route => {
+    const body = route.request().postDataJSON();
+    expect(body.name).toBe("Sample vault review");
+    expect(body.permittedTargets).toBe("contracts/Vault.sol");
+    expect(body.additionalContext).toContain("Vault library");
+    expect(body.additionalContext).not.toContain("researcherAccount");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      value: body.field === "agentContext" ? "Use the pinned source revision." : "Stay within contracts/Vault.sol.",
+    }) });
+  });
+  await page.getByRole("button", { name: "Generate with AI for Agent-readable setup" }).click();
+  await expect(page.getByRole("textbox", { name: /Agent-readable setup/ })).toHaveValue("Use the pinned source revision.");
+  await page.getByRole("button", { name: "Generate with AI for Agent permissions and tool limits" }).click();
+  await expect(page.getByRole("textbox", { name: /Agent permissions and tool limits/ })).toHaveValue("Stay within contracts/Vault.sol.");
+  expect(posts).toHaveLength(2);
+  expect(posts.every(url => url.endsWith("/v1/programs/agent-setup"))).toBe(true);
+  await page.getByRole("textbox", { name: /Agent permissions and tool limits/ }).fill("Stay within the authorized source.");
+  await page.route("**/v1/auth/me", route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ authenticated: true, account: "test-owner", csrfToken: "csrf" }) }));
+  await page.route("**/v1/programs", async route => {
+    expect(route.request().headers()["x-veripoc-csrf"]).toBe("csrf");
+    const body = route.request().postDataJSON();
+    expect(body.contact).toBe("team@example.org");
+    expect(body.docsUrl).toBe("https://docs.example.org/vault");
+    expect(body.agentContext).toBe("Use the pinned source revision.");
+    expect(body.references).toHaveLength(1);
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ program: { id } }) });
+  });
+  await page.getByRole("button", { name: "Create bounty" }).click();
+  await expect(page.getByRole("link", { name: "Open saved program" })).toHaveAttribute("href", `/programs/${id}`);
   await page.reload();
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).not.toContainText("Sample vault review");
+});
+
+test("profile has projects and findings without exposing private programs to visitors", async ({ page }) => {
+  await page.route("**/v1/auth/me", route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ authenticated: false }) }));
+  await page.goto("/profile/projects");
+  await expect(page.getByRole("navigation", { name: "Profile sections" }).getByRole("link")).toHaveCount(2);
+  await expect(page.getByRole("link", { name: "Projects", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("tab", { name: "Owned" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("table", { name: "Owned projects" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create Program" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign with Concordium" })).toBeVisible();
+  await expect(page.getByText("My programs")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Invited" }).click();
+  await expect(page.getByRole("table", { name: "Invited projects" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create Program" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Findings", exact: true }).click();
+  await expect(page).toHaveURL(/\/profile\/findings$/);
+  await expect(page.getByRole("link", { name: "Findings", exact: true })).toHaveAttribute("aria-current", "page");
+});
+
+test("owner can sign into profile and revisit saved programs", async ({ page }) => {
+  let signedIn = false;
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "concordium", { value: {
+      requestAccounts: async () => ["mock-team-account"],
+      signMessage: async () => ({ signature: "mock-signature" }),
+    } });
+  });
+  await page.route("**/v1/auth/me", route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify(signedIn ? { authenticated: true, account: "mock-team-account", csrfToken: "mock-csrf" } : { authenticated: false }) }));
+  await page.route("**/v1/auth/concordium/challenge", route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ challengeId: "mock-challenge", message: "Sign this challenge" }) }));
+  await page.route("**/v1/auth/concordium/verify", route => {
+    signedIn = true;
+    return route.fulfill({ status: 200, contentType: "application/json",
+      body: JSON.stringify({ authenticated: true, account: "mock-team-account", csrfToken: "mock-csrf" }) });
+  });
+  await page.route("**/v1/programs/mine", route => route.fulfill({ status: signedIn ? 200 : 403,
+    contentType: "application/json", body: JSON.stringify(signedIn ? { programs: [{ id: "11111111-1111-1111-1111-111111111111",
+      name: "Saved vault", ownerAccount: "mock-team-account", status: "active", visibility: "private",
+      verification: "not-configured", sourceUrl: "https://example.org/vault", sourceRevision: "a".repeat(40),
+      chain: "evm-local", permittedTargets: ["src/Vault.sol"], rules: "Review the vault", exclusions: "Other targets",
+      runLimit: 2 }] } : { error: "team account required" }) }));
+  await page.route("**/v1/programs/invited", route => route.fulfill({ status: signedIn ? 200 : 401,
+    contentType: "application/json", body: JSON.stringify(signedIn ? { programs: [{ id: "22222222-2222-2222-2222-222222222222",
+      name: "Invited review", ownerAccount: "other-team", status: "active", visibility: "private",
+      verification: "not-configured", sourceRevision: "b".repeat(40), chain: "evm-local" }] } : { error: "wallet session required" }) }));
+  await page.goto("/profile/projects");
+  await page.getByRole("button", { name: "Sign with Concordium" }).click();
+  await expect(page.getByRole("table", { name: "Owned projects" })).toContainText("Saved vault");
+  await expect(page.getByRole("table", { name: "Owned projects" })).not.toContainText("Invited review");
+  await expect(page.getByRole("link", { name: "Open Saved vault" })).toHaveAttribute("href", "/programs/11111111-1111-1111-1111-111111111111");
+  await page.getByRole("tab", { name: "Invited" }).click();
+  await expect(page.getByRole("table", { name: "Invited projects" })).toContainText("Invited review");
+  await expect(page.getByRole("table", { name: "Invited projects" })).not.toContainText("Saved vault");
 });
 
 test("legacy /verify operator console remains available", async ({ page }) => {
