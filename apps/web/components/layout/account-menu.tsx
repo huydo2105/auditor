@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Inbox, LogOut, ShieldCheck, SlidersHorizontal, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import type { WalletApi } from "@concordium/browser-wallet-api-helpers";
 
 type ProgramRole = "team" | "researcher";
 
@@ -37,7 +36,6 @@ export function AccountMenu() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const providerRef = useRef<WalletApi | null>(null);
 
   useEffect(() => {
     if (error) {
@@ -103,55 +101,9 @@ export function AccountMenu() {
         setError("No Concordium account was selected in the wallet.");
         return;
       }
-      providerRef.current = provider;
       setWalletAccount(account);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Wallet connection was cancelled or failed.";
-      setError(message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function signIn() {
-    const account = walletAccount;
-    const provider = providerRef.current;
-    if (!account || !provider || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const challengeRes = await fetch("/v1/auth/concordium/challenge", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ account }),
-      });
-      const challenge = await challengeRes.json().catch(() => ({}));
-      if (!challengeRes.ok || typeof challenge.challengeId !== "string" || typeof challenge.message !== "string") {
-        setError(challengeRes.status >= 500
-          ? "VeriPoC sign-in is unavailable. Your wallet remains connected."
-          : challenge.error || "Could not start Concordium wallet sign-in.");
-        return;
-      }
-
-      const signature = await provider.signMessage(account, challenge.message);
-      const verifyRes = await fetch("/v1/auth/concordium/verify", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.challengeId, account, signature }),
-      });
-      const verified = await verifyRes.json().catch(() => ({}));
-      if (!verifyRes.ok || !verified.authenticated) {
-        setError(verified.error || "Concordium wallet signature verification failed.");
-        return;
-      }
-      setSession(verified);
-      setMenuOpen(false);
-    } catch (err) {
-      const message = err instanceof TypeError
-        ? "VeriPoC sign-in is unavailable. Your wallet remains connected."
-        : err instanceof Error ? err.message : "Wallet sign-in was cancelled or failed.";
       setError(message);
     } finally {
       setBusy(false);
@@ -227,7 +179,7 @@ export function AccountMenu() {
             type="button"
             className="header-connect-btn focus-ring"
             aria-expanded={menuOpen}
-            aria-label={`Connected wallet ${shortAddress(walletAccount!)}, not signed in`}
+            aria-label={`Connected wallet ${shortAddress(walletAccount!)}`}
             onClick={() => setMenuOpen(open => !open)}
           >
             <Wallet size={15} aria-hidden="true" />
@@ -237,21 +189,15 @@ export function AccountMenu() {
             <div className="account-dropdown" role="group" aria-label="Connected Concordium wallet">
               <div className="account-dropdown-head">
                 <strong className="mono-data" data-testid="wallet-only-account">{shortAddress(walletAccount!)}</strong>
-                <span className="account-role-pill">Wallet connected · Not signed in</span>
-                <p className="account-role-note">Sign in to access private programs.</p>
+                <span className="account-role-pill">Wallet connected</span>
               </div>
               <div className="account-dropdown-links">
-                <button type="button" className="account-dropdown-item focus-ring" disabled={busy} onClick={signIn}>
-                  <ShieldCheck size={15} aria-hidden="true" />
-                  <span>{busy ? "Signing…" : "Sign in to VeriPoC"}</span>
-                </button>
-                <button type="button" className="account-dropdown-item focus-ring" disabled={busy} onClick={() => {
-                  providerRef.current = null;
+                <button type="button" className="account-dropdown-item focus-ring" aria-label="Disconnect wallet from this page" onClick={() => {
                   setWalletAccount(null);
                   setMenuOpen(false);
                 }}>
                   <LogOut size={15} aria-hidden="true" />
-                  <span>Forget wallet</span>
+                  <span>Disconnect</span>
                 </button>
               </div>
             </div>
