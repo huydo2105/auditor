@@ -641,9 +641,9 @@ summary { cursor: pointer; }
 .draft-stage .draft-form { display: grid; gap: 22px; padding: 0; border: 0; background: none; }
 .draft-field label { display: block; margin-bottom: 9px; font-weight: 700; }
 .draft-field label span { color: var(--accent); }
-.draft-field input, .draft-field textarea { width: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--page); color: var(--ink); font: inherit; }
+.draft-field input, .draft-field textarea, .draft-field select, .draft-preview input, .draft-preview select { width: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--page); color: var(--ink); font: inherit; }
 .draft-field textarea { resize: vertical; }
-.draft-field input:focus-visible, .draft-field textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.draft-field input:focus-visible, .draft-field textarea:focus-visible, .draft-field select:focus-visible, .draft-preview input:focus-visible, .draft-preview select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .draft-field > p { margin-top: 7px; color: var(--muted); font-size: .78rem; line-height: 1.5; }
 .draft-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 8px; }
 .draft-back { padding: 12px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--page); color: var(--ink); cursor: pointer; }

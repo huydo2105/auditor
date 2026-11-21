@@ -7,6 +7,7 @@ import { Worker } from "node:worker_threads";
 import { DEMO_PROGRAM, fixtureRevisionMatches, publicProgram } from "./program.mjs";
 import { authorizeAgentRequest, lookupConcordiumAgent, pruneExpiredNonces } from "./agent-auth.mjs";
 import { createWalletAuthStore, formatClearSessionCookie, formatSessionCookie } from "./wallet-auth.mjs";
+import { createProgramStore } from "./program-store.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = value => createHash("sha256").update(value).digest("hex");
@@ -16,6 +17,8 @@ const json = (res, code, value, extraHeaders = {}) => {
   res.end(JSON.stringify(value));
 };
 const fail = (status, message) => Object.assign(new Error(message), { status });
+const programForMember = (item, account, badge) => ({ ...item,
+  invitedResearcherAccounts: account ? [account] : [], invitedAgentBadges: badge ? [badge] : [] });
 const equalToken = (given, expected) => {
   if (typeof given !== "string" || typeof expected !== "string" || !given.startsWith("Bearer ")) return false;
   const a = Buffer.from(sha(given.slice(7)));
@@ -69,7 +72,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
   invitedAgentBadges = [], agentDomain, lookupAgent = lookupConcordiumAgent,
   allowedOrigins = [], teamAccounts = [], invitedResearcherAccounts = [], lookupAccountInfo,
   secureCookies = process.env.NODE_ENV === "production",
-  execute = executeJob, now = Date.now, maxJobs = 16 } = {}) {
+  execute = executeJob, now = Date.now, maxJobs = 16, programStorePath = null } = {}) {
   if (typeof token !== "string" || token.length < 32) throw new Error("VERIPOC_API_TOKEN must be at least 32 characters");
   const configured = [teamToken, researcherToken].filter(value => value !== undefined);
   if (configured.some(value => typeof value !== "string" || value.length < 32)
@@ -79,6 +82,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
     || (invitedAgentBadges.length && (!agentDomain || !teamToken || !researcherToken)))
     throw new Error("signed agent access requires an explicit domain, invitation, and both program tokens");
   const walletAuth = createWalletAuthStore({ allowedOrigins, teamAccounts, invitedResearcherAccounts, lookupAccountInfo, now });
+  const programStore = createProgramStore({ filePath: programStorePath, now });
   const jobs = new Map();
   const idempotency = new Map();
   const submissions = new Map();
@@ -167,6 +171,75 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
       } catch (error) {
         return json(res, error.status ?? 500, { error: error.status ? error.message : "internal error" });
       }
+    }
+    const programParts = path.split("/").slice(3);
+    const dynamicId = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+    const isDynamicProgram = path === "/v1/programs" || path === "/v1/programs/mine"
+      || path === "/v1/programs/invited" || (path.startsWith("/v1/programs/") && dynamicId.test(programParts[0] ?? ""));
+    if (isDynamicProgram) {
+      const programRateKey = `${req.socket.remoteAddress}:program:${req.method === "POST" ? "write" : "read"}`;
+      const programNow = now();
+      const previous = buckets.get(programRateKey);
+      const bucket = !previous || programNow - previous.start >= 60_000 ? { start: programNow, count: 0 } : previous;
+      bucket.count++;
+      buckets.set(programRateKey, bucket);
+      if (bucket.count > (req.method === "POST" ? 30 : 120)) return json(res, 429, { error: "rate limit exceeded" });
+      if (req.headers.authorization) return json(res, 401, { error: "wallet session required" });
+      try {
+        const account = walletAuth.accountFromCookie({ cookieHeader: req.headers.cookie, method: req.method,
+          origin: req.headers.origin, csrfHeader: req.headers["x-veripoc-csrf"] });
+        if (path === "/v1/programs/mine" && req.method === "GET") {
+          if (!account || !teamAccounts.includes(account)) throw fail(403, "team account required");
+          return json(res, 200, { programs: programStore.list().filter(item => item.ownerAccount === account) });
+        }
+        if (path === "/v1/programs/invited" && req.method === "GET") {
+          if (!account) throw fail(401, "wallet session required");
+          return json(res, 200, { programs: programStore.list().filter(item => item.status === "active"
+            && item.invitedResearcherAccounts.includes(account)).map(item => programForMember(item, account)) });
+        }
+        if (path === "/v1/programs" && req.method === "POST") {
+          if (!account || !teamAccounts.includes(account)) throw fail(403, "team account required");
+          const item = programStore.create(account, await readBody(req));
+          return json(res, 201, { program: item });
+        }
+        if (!dynamicId.test(programParts[0] ?? "")) return json(res, 404, { error: "not found" });
+        const item = programStore.get(programParts[0]);
+        if (!item) return json(res, 404, { error: "program not found" });
+        const isOwner = account === item.ownerAccount;
+        const isInvited = item.status === "active" && account && item.invitedResearcherAccounts.includes(account);
+        let isInvitedAgent = false;
+        if (item.status === "active" && !account && req.method === "GET" && agentDomain
+          && item.invitedAgentBadges.includes(req.headers["x-veripoc-agent-badge"])) {
+          pruneExpiredNonces(usedAgentNonces, now());
+          const actor = await authorizeAgentRequest({ headers: req.headers, method: req.method, path,
+            body: Buffer.alloc(0), domain: agentDomain, invitedBadges: item.invitedAgentBadges,
+            lookup: lookupAgent, now, usedNonces: usedAgentNonces });
+          isInvitedAgent = Boolean(actor);
+        }
+        if (!isOwner && !isInvited && !isInvitedAgent) return json(res, 404, { error: "program not found" });
+        if (req.method === "GET" && programParts.length === 1)
+          return json(res, 200, { program: isOwner ? item : programForMember(item, account,
+            isInvitedAgent ? req.headers["x-veripoc-agent-badge"] : null),
+          actor: { role: isOwner ? "team" : "researcher" } });
+        if (req.method === "GET" && programParts.length === 2 && programParts[1] === "submissions")
+          return json(res, 200, { submissions: [] });
+        if (req.method === "GET" && programParts.length === 2 && programParts[1] === "jobs")
+          return json(res, 200, { jobs: [] });
+        if (!isOwner || !account) return json(res, 403, { error: "owner account required" });
+        if (req.method === "POST" && programParts.length === 2 && programParts[1] === "invitations") {
+          const body = await readBody(req);
+          if (!body || typeof body !== "object" || Array.isArray(body)
+            || Object.keys(body).sort().join() !== "action,kind,value") throw fail(400, "invalid invitation fields");
+          return json(res, 200, { program: programStore.changeInvitation(item.id, body.kind, body.value, body.action) });
+        }
+        if (req.method === "POST" && programParts.length === 2 && programParts[1] === "status") {
+          const body = await readBody(req);
+          if (!body || typeof body !== "object" || Array.isArray(body)
+            || Object.keys(body).join() !== "status") throw fail(400, "invalid status fields");
+          return json(res, 200, { program: programStore.changeStatus(item.id, body.status) });
+        }
+        return json(res, 404, { error: "not found" });
+      } catch (error) { return json(res, error.status ?? 500, { error: error.status ? error.message : "internal error" }); }
     }
     const isProgram = path.startsWith("/v1/programs/");
     let actor = equalToken(req.headers.authorization, teamToken) && teamToken ? { id: DEMO_PROGRAM.ownerId, role: "team" }

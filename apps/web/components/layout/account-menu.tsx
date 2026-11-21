@@ -260,7 +260,11 @@ export function AccountMenu() {
                 </Link>
                 <Link href="/teams/new" className="account-dropdown-item focus-ring" role="menuitem" onClick={() => setMenuOpen(false)}>
                   <SlidersHorizontal size={15} aria-hidden="true" />
-                  <span>Bounty setup preview</span>
+                  <span>Create a program</span>
+                </Link>
+                <Link href="/teams/programs" className="account-dropdown-item focus-ring" role="menuitem" onClick={() => setMenuOpen(false)}>
+                  <ShieldCheck size={15} aria-hidden="true" />
+                  <span>My programs</span>
                 </Link>
                 <button
                   type="button"
