@@ -8,6 +8,7 @@ import { AccountAddress, buildBasicAccountSigner, signMessage } from "@concordiu
 import { privateKeyToAccount } from "viem/accounts";
 import { createApiServer } from "./server.mjs";
 import { agentMessage } from "./agent-auth.mjs";
+import { generateAgentSetup } from "./agent-setup.mjs";
 
 const origin = "http://127.0.0.1:3000";
 const token = "operator-token-with-at-least-thirty-two-characters";
@@ -30,7 +31,11 @@ const outsider = identity(0x53);
 const secondOwner = identity(0x54);
 const identities = new Map([owner, researcher, outsider, secondOwner].map(item => [item.account, item.accountInfo]));
 const draft = { name: "Scoped Vault Review", sourceUrl: "https://github.com/example/review",
-  sourceRevision: "a".repeat(40), chain: "evm-local", confidentiality: "members-only",
+  sourceRevision: "a".repeat(40), chain: "evm-local", confidentiality: "members-only", visibility: "private",
+  contact: "team@example.com", docsUrl: "https://example.com/docs", agentContext: "Use the pinned local source.",
+  rewardCurrency: "USD", rewardTiers: ["critical", "high", "medium", "low", "informational"]
+    .map(severity => ({ severity, min: 0, max: 0 })),
+  references: [{ kind: "source", name: "Library", url: "https://github.com/example/library" }],
   permittedTargets: ["contracts/Vault.sol"], rules: "Local fork only; reviewed source revision.",
   exclusions: "No deployed contracts or third-party systems.", runLimit: 4,
   invitedResearcherAccounts: [researcher.account], invitedAgentBadges: [] };
@@ -80,6 +85,9 @@ test("team-owned program persists and grants only invited private reads", async 
     const id = created.data.program.id;
     assert.equal(created.data.program.ownerAccount, owner.account);
     assert.equal(created.data.program.verification, "not-configured");
+    assert.equal(created.data.program.contact, draft.contact);
+    assert.equal(created.data.program.agentContext, draft.agentContext);
+    assert.deepEqual(created.data.program.references, draft.references);
     assert.equal((await call(app.base, "/v1/programs/mine", o)).data.programs[0].id, id);
     assert.deepEqual((await call(app.base, "/v1/programs/mine", other)).data.programs, []);
     assert.equal((await call(app.base, `/v1/programs/${id}`, other)).status, 404);
@@ -96,6 +104,7 @@ test("team-owned program persists and grants only invited private reads", async 
     assert.equal((await call(app.base, `/v1/programs/${id}`, o)).status, 404);
     const relogin = await login(app.base, owner);
     assert.equal((await call(app.base, `/v1/programs/${id}`, relogin)).data.program.sourceRevision, draft.sourceRevision);
+    assert.equal((await call(app.base, `/v1/programs/${id}`, relogin)).data.program.docsUrl, draft.docsUrl);
     const rejoined = await login(app.base, outsider);
     assert.equal((await call(app.base, `/v1/programs/${id}`, rejoined)).status, 200);
     await app.close();
@@ -188,4 +197,68 @@ test("a signed agent reads only its invited active program", async () => {
       { action: "revoke", kind: "agent-badge", value: badge })).status, 200);
     assert.equal((await signed(`/v1/programs/${id}`)).status, 404);
   } finally { await new Promise(resolve => app.close(resolve)); }
+});
+
+test("public scope is discoverable without opening private references or job access", async () => {
+  const app = await server(null);
+  try {
+    const o = await login(app.base, owner);
+    const privateItem = await call(app.base, "/v1/programs", o, draft);
+    const publicDraft = { ...draft, visibility: "public", invitedResearcherAccounts: [], invitedAgentBadges: [] };
+    assert.equal((await call(app.base, "/v1/programs", o, { ...publicDraft, invitedResearcherAccounts: [researcher.account] })).status, 400);
+    assert.equal((await call(app.base, "/v1/programs", o, { ...publicDraft,
+      rewardTiers: [{ ...draft.rewardTiers[0], min: 5, max: 2 }, ...draft.rewardTiers.slice(1)] })).status, 400);
+    assert.equal((await call(app.base, "/v1/programs", o, { ...publicDraft,
+      references: [{ kind: "source", name: "Unsafe", url: "http://example.com" }] })).status, 400);
+    const publicItem = await call(app.base, "/v1/programs", o, publicDraft);
+    assert.equal(publicItem.status, 201);
+    const id = publicItem.data.program.id;
+    const publicListing = await call(app.base, "/v1/programs/public", null);
+    assert.deepEqual(publicListing.data.programs.map(item => item.id), [id]);
+    const scope = await call(app.base, `/v1/programs/${id}`, null);
+    assert.equal(scope.status, 200);
+    assert.equal(scope.data.actor.role, "visitor");
+    assert.equal(scope.data.program.contact, undefined);
+    assert.equal(scope.data.program.invitedResearcherAccounts, undefined);
+    assert.equal((await call(app.base, `/v1/programs/${privateItem.data.program.id}`, null)).status, 404);
+    assert.equal((await call(app.base, `/v1/programs/${id}/submissions`, null)).status, 404);
+    assert.equal((await call(app.base, `/v1/programs/${id}/invitations`, o,
+      { action: "invite", kind: "researcher-account", value: researcher.account })).status, 400);
+    assert.equal((await call(app.base, `/v1/programs/${id}/status`, o, { status: "paused" })).status, 200);
+    assert.deepEqual((await call(app.base, "/v1/programs/public", null)).data.programs, []);
+  } finally { await app.close(); }
+});
+
+test("AI setup generation requires team session and returns editable bounded text", async () => {
+  const input = { name: draft.name, sourceUrl: draft.sourceUrl, sourceRevision: draft.sourceRevision,
+    chain: draft.chain, permittedTargets: draft.permittedTargets.join("\n"), instructions: draft.rules,
+    invariants: "No zero shares", exclusions: draft.exclusions, policy: "Local tests only",
+    additionalContext: JSON.stringify({ rewards: draft.rewardTiers, references: draft.references }) };
+  let calls = 0;
+  const app = createApiServer({ token, teamAccounts: [owner.account],
+    lookupAccountInfo: async account => identities.get(account) ?? null,
+    generateSetup: async context => { calls++; assert.deepEqual(context, input);
+      return { agentContext: "Run local tests.", agentRules: "Stay in scope." }; } });
+  await new Promise(resolve => app.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${app.address().port}`;
+  try {
+    const o = await login(base, owner);
+    const r = await login(base, researcher);
+    assert.equal((await call(base, "/v1/programs/agent-setup", null, input)).status, 403);
+    assert.equal((await call(base, "/v1/programs/agent-setup", r, input)).status, 403);
+    assert.equal((await call(base, "/v1/programs/agent-setup", o,
+      { ...input, sourceRevision: "unbounded" })).status, 400);
+    const generated = await call(base, "/v1/programs/agent-setup", o, input);
+    assert.equal(generated.status, 200);
+    assert.equal(generated.data.agentRules, "Stay in scope.");
+    assert.equal(calls, 1);
+  } finally { await new Promise(resolve => app.close(resolve)); }
+  await assert.rejects(() => generateAgentSetup(input, { apiKey: "" }), { status: 503 });
+  const generated = await generateAgentSetup(input, { apiKey: "test-key", fetcher: async (_url, options) => {
+    assert.equal(options.headers.authorization, "Bearer test-key");
+    assert.equal(JSON.parse(options.body).store, false);
+    return { ok: true, json: async () => ({ status: "completed", output: [{ content: [{ type: "output_text",
+      text: JSON.stringify({ agentContext: "Check pinned source.", agentRules: "Local only." }) }] }] }) };
+  } });
+  assert.equal(generated.agentContext, "Check pinned source.");
 });

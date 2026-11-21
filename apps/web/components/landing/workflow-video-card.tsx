@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { RotateCcw } from "lucide-react";
 
 type WorkflowVideoCardProps = {
   src?: string;
@@ -13,7 +12,6 @@ type WorkflowVideoCardProps = {
 export function WorkflowVideoCard({
   src = "/workflows/create-bounty.gif",
   ariaLabel = "DeFi team workflow: defining contract scope, pinned source revision, and testing rules",
-  replayLabel = "Replay DeFi team workflow animation",
 }: WorkflowVideoCardProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);

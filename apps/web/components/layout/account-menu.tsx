@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Inbox, LogOut, ShieldCheck, SlidersHorizontal, Wallet } from "lucide-react";
+import { Inbox, LogOut, ShieldCheck, SlidersHorizontal, UserRound, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 type ProgramRole = "team" | "researcher";
@@ -192,6 +192,7 @@ export function AccountMenu() {
                 <span className="account-role-pill">Wallet connected</span>
               </div>
               <div className="account-dropdown-links">
+                <Link href="/profile/projects" className="account-dropdown-item focus-ring" onClick={() => setMenuOpen(false)}><UserRound size={15} aria-hidden="true" /><span>Profile</span></Link>
                 <button type="button" className="account-dropdown-item focus-ring" aria-label="Disconnect wallet from this page" onClick={() => {
                   setWalletAccount(null);
                   setMenuOpen(false);
@@ -254,6 +255,9 @@ export function AccountMenu() {
                 <p className="account-role-note">Preference only; program access is granted by the server.</p>
               </div>
               <div className="account-dropdown-links">
+                <Link href="/profile/projects" className="account-dropdown-item focus-ring" role="menuitem" onClick={() => setMenuOpen(false)}>
+                  <UserRound size={15} aria-hidden="true" /><span>Profile</span>
+                </Link>
                 <Link href="/programs/demo-vault" className="account-dropdown-item focus-ring" role="menuitem" onClick={() => setMenuOpen(false)}>
                   <ShieldCheck size={15} aria-hidden="true" />
                   <span>Authorized Demo Vault</span>
@@ -261,10 +265,6 @@ export function AccountMenu() {
                 <Link href="/teams/new" className="account-dropdown-item focus-ring" role="menuitem" onClick={() => setMenuOpen(false)}>
                   <SlidersHorizontal size={15} aria-hidden="true" />
                   <span>Create a program</span>
-                </Link>
-                <Link href="/teams/programs" className="account-dropdown-item focus-ring" role="menuitem" onClick={() => setMenuOpen(false)}>
-                  <ShieldCheck size={15} aria-hidden="true" />
-                  <span>My programs</span>
                 </Link>
                 <button
                   type="button"
