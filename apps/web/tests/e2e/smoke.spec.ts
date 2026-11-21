@@ -521,6 +521,10 @@ test("Concordium wallet login shows honest missing-wallet state, verifies real s
   try {
     const context = await browser.newContext({ baseURL });
     const page = await context.newPage();
+    let challengeRequests = 0;
+    page.on("request", request => {
+      if (new URL(request.url()).pathname === "/v1/auth/concordium/challenge") challengeRequests++;
+    });
     await page.route("**/v1/auth/**", async route => {
       const req = route.request();
       const url = new URL(req.url());
@@ -560,7 +564,6 @@ test("Concordium wallet login shows honest missing-wallet state, verifies real s
     await page.getByRole("button", { name: "Switch to dark mode" }).click();
     await expect(toaster).toHaveAttribute("data-sonner-theme", "dark");
     await page.getByRole("button", { name: "Close toast" }).click();
-    await page.setViewportSize({ width: 1280, height: 720 });
 
     // Inject a real Concordium provider bridge backed by our Node Ed25519 signer.
     await page.exposeFunction("__veripocSignConcordium", async (message: string) => {
@@ -575,10 +578,26 @@ test("Concordium wallet login shows honest missing-wallet state, verifies real s
       };
     }, address.address);
 
+    await page.route("**/v1/auth/concordium/challenge", route => route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "verification API is unavailable" }),
+    }));
     await page.reload();
     await page.getByRole("button", { name: "Connect Concordium wallet" }).click();
+    await expect(page.getByRole("button", { name: /Connected wallet .*not signed in/ })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    expect(challengeRequests).toBe(0);
+    await expect(page.getByRole("link", { name: "Program inbox" })).toHaveCount(0);
+    await page.getByRole("button", { name: /Connected wallet .*not signed in/ }).click();
+    await expect(page.getByTestId("wallet-only-account")).toContainText(address.address.slice(0, 6));
+    await page.getByRole("button", { name: "Sign in to VeriPoC" }).click();
+    await expect(page.getByTestId("wallet-auth-error")).toContainText("VeriPoC sign-in is unavailable. Your wallet remains connected.");
+    await expect(page.getByRole("button", { name: /Connected wallet .*not signed in/ })).toBeVisible();
+    await page.unroute("**/v1/auth/concordium/challenge");
+    await page.getByRole("button", { name: "Sign in to VeriPoC" }).click();
 
-    // Header now shows Inbox link and Avatar button; dropdown shows connected address and server-derived Team role.
+    // Only the server-verified sign-in grants an inbox link and server-derived Team role.
     await expect(page.getByRole("link", { name: "Program inbox" })).toBeVisible();
     await page.getByRole("button", { name: /Account menu for/ }).click();
     await expect(page.getByTestId("connected-account")).toContainText(address.address.slice(0, 6));
@@ -589,8 +608,19 @@ test("Concordium wallet login shows honest missing-wallet state, verifies real s
     expect(page.url()).not.toContain(address.address);
     expect(storageDump).not.toContain("veripoc_session");
 
-    // Sign out revokes session and returns Connect Concordium button.
+    // An unavailable logout must not claim the server session was revoked.
+    await page.route("**/v1/auth/logout", route => route.fulfill({ status: 503, body: "{}" }));
     await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page.getByTestId("wallet-auth-error")).toContainText("session is still active");
+    await expect(page.getByRole("link", { name: "Program inbox" })).toBeVisible();
+    await page.unroute("**/v1/auth/logout");
+
+    // Successful sign out revokes the session but leaves the independently connected wallet visible.
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await expect(page.getByRole("button", { name: /Connected wallet .*not signed in/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Program inbox" })).toHaveCount(0);
+    await page.getByRole("button", { name: /Connected wallet .*not signed in/ }).click();
+    await page.getByRole("button", { name: "Forget wallet" }).click();
     await expect(page.getByRole("button", { name: "Connect Concordium wallet" })).toBeVisible();
     await context.close();
   } finally {

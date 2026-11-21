@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Inbox, LogOut, ShieldCheck, SlidersHorizontal, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import type { WalletApi } from "@concordium/browser-wallet-api-helpers";
 
 type ProgramRole = "team" | "researcher";
 
@@ -31,10 +32,12 @@ function roleSummary(session: WalletSession): string {
 
 export function AccountMenu() {
   const [session, setSession] = useState<WalletSession | null>(null);
+  const [walletAccount, setWalletAccount] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const providerRef = useRef<WalletApi | null>(null);
 
   useEffect(() => {
     if (error) {
@@ -85,7 +88,7 @@ export function AccountMenu() {
       try {
         provider = await detectConcordiumProvider(2000);
       } catch {
-        setError("Concordium Browser Wallet not detected. Install or unlock the extension to sign in.");
+        setError("Concordium Browser Wallet not detected. Install or unlock the extension to connect.");
         return;
       }
       let account: string | undefined;
@@ -100,7 +103,23 @@ export function AccountMenu() {
         setError("No Concordium account was selected in the wallet.");
         return;
       }
+      providerRef.current = provider;
+      setWalletAccount(account);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Wallet connection was cancelled or failed.";
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
+  async function signIn() {
+    const account = walletAccount;
+    const provider = providerRef.current;
+    if (!account || !provider || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
       const challengeRes = await fetch("/v1/auth/concordium/challenge", {
         method: "POST",
         credentials: "same-origin",
@@ -109,7 +128,9 @@ export function AccountMenu() {
       });
       const challenge = await challengeRes.json().catch(() => ({}));
       if (!challengeRes.ok || typeof challenge.challengeId !== "string" || typeof challenge.message !== "string") {
-        setError(challenge.error || "Could not start Concordium wallet sign-in.");
+        setError(challengeRes.status >= 500
+          ? "VeriPoC sign-in is unavailable. Your wallet remains connected."
+          : challenge.error || "Could not start Concordium wallet sign-in.");
         return;
       }
 
@@ -128,7 +149,9 @@ export function AccountMenu() {
       setSession(verified);
       setMenuOpen(false);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Wallet sign-in was cancelled or failed.";
+      const message = err instanceof TypeError
+        ? "VeriPoC sign-in is unavailable. Your wallet remains connected."
+        : err instanceof Error ? err.message : "Wallet sign-in was cancelled or failed.";
       setError(message);
     } finally {
       setBusy(false);
@@ -167,21 +190,27 @@ export function AccountMenu() {
     setBusy(true);
     setError(null);
     try {
-      await fetch("/v1/auth/logout", {
+      const response = await fetch("/v1/auth/logout", {
         method: "POST",
         credentials: "same-origin",
         headers: { "x-veripoc-csrf": session.csrfToken },
       });
-    } finally {
+      if (!response.ok) {
+        setError("Could not sign out. Your VeriPoC session is still active.");
+        return;
+      }
       setSession(null);
       setMenuOpen(false);
+    } catch {
+      setError("Could not sign out. Your VeriPoC session is still active.");
+    } finally {
       setBusy(false);
     }
   }
 
   return (
     <div ref={wrapRef} className="account-menu-wrap">
-      {!session ? (
+      {!session && !walletAccount ? (
         <button
           type="button"
           className="header-connect-btn focus-ring"
@@ -190,8 +219,44 @@ export function AccountMenu() {
           aria-label="Connect Concordium wallet"
         >
           <Wallet size={15} aria-hidden="true" />
-          <span className="header-connect-label">{busy ? "Signing…" : "Connect Concordium"}</span>
+          <span className="header-connect-label">{busy ? "Connecting…" : "Connect Concordium"}</span>
         </button>
+      ) : !session ? (
+        <div className="account-authed">
+          <button
+            type="button"
+            className="header-connect-btn focus-ring"
+            aria-expanded={menuOpen}
+            aria-label={`Connected wallet ${shortAddress(walletAccount!)}, not signed in`}
+            onClick={() => setMenuOpen(open => !open)}
+          >
+            <Wallet size={15} aria-hidden="true" />
+            <span className="header-connect-label">{shortAddress(walletAccount!)}</span>
+          </button>
+          {menuOpen && (
+            <div className="account-dropdown" role="group" aria-label="Connected Concordium wallet">
+              <div className="account-dropdown-head">
+                <strong className="mono-data" data-testid="wallet-only-account">{shortAddress(walletAccount!)}</strong>
+                <span className="account-role-pill">Wallet connected · Not signed in</span>
+                <p className="account-role-note">Sign in to access private programs.</p>
+              </div>
+              <div className="account-dropdown-links">
+                <button type="button" className="account-dropdown-item focus-ring" disabled={busy} onClick={signIn}>
+                  <ShieldCheck size={15} aria-hidden="true" />
+                  <span>{busy ? "Signing…" : "Sign in to VeriPoC"}</span>
+                </button>
+                <button type="button" className="account-dropdown-item focus-ring" disabled={busy} onClick={() => {
+                  providerRef.current = null;
+                  setWalletAccount(null);
+                  setMenuOpen(false);
+                }}>
+                  <LogOut size={15} aria-hidden="true" />
+                  <span>Forget wallet</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="account-authed">
           <Link
