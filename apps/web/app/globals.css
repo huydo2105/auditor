@@ -637,6 +637,11 @@ summary { cursor: pointer; }
 .draft-stage { min-width: 0; padding: 40px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
 .draft-stage-heading > span { color: var(--accent); font-size: .74rem; font-weight: 700; letter-spacing: .1em; }
 .draft-stage-heading h2 { margin-top: 14px; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.05em; }
+.draft-stage-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.draft-stage-title-row h2 { min-width: 0; }
+.draft-generate-button { flex: none; margin-top: 14px; min-height: 44px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--page); color: var(--ink); font: inherit; font-weight: 650; cursor: pointer; }
+.draft-generate-button:hover { border-color: var(--accent); color: var(--accent); }
+.draft-generate-button:disabled { cursor: wait; opacity: .6; }
 .draft-stage-heading p { margin: 10px 0 24px; color: var(--muted); line-height: 1.6; }
 .draft-stage .draft-form { display: grid; gap: 22px; padding: 0; border: 0; background: none; }
 .draft-field label { display: block; margin-bottom: 9px; font-weight: 700; }
@@ -649,26 +654,32 @@ summary { cursor: pointer; }
 .draft-back { padding: 12px 16px; border: 1px solid var(--line); border-radius: 9px; background: var(--page); color: var(--ink); cursor: pointer; }
 .draft-page > .draft-preview { max-width: none; }
 @media (max-width: 750px) { .draft-wizard { grid-template-columns: 1fr; gap: 22px; } .draft-steps { display: flex; overflow-x: auto; padding-bottom: 8px; } .draft-steps button { white-space: nowrap; } .draft-stage { padding: 23px; } }
-.draft-field-title { display: inline-flex; align-items: baseline; justify-content: flex-start; gap: 2px; margin-bottom: 9px; }
+.draft-field-title { display: inline-flex; align-items: baseline; justify-content: flex-start; gap: 0; margin-bottom: 9px; }
 .draft-field-title label { display: inline; flex: none; width: auto; margin: 0; }
 .draft-help-wrap { position: relative; display: inline-flex; }
-.draft-help { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: help; }
+.draft-help { position: relative; display: inline-flex; align-items: flex-start; justify-content: flex-start; width: 16px; height: 18px; margin-left: 1px; padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: .9rem; font-weight: 700; line-height: 1; cursor: help; }
+.draft-help::before { content: ""; position: absolute; inset: -12px; }
 .draft-help:hover, .draft-help:focus-visible { color: var(--accent); }
 .draft-help-tip { position: absolute; z-index: 10; right: 0; bottom: calc(100% + 8px); width: min(300px, 70vw); padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); box-shadow: 0 10px 25px #0002; font-size: .8rem; line-height: 1.45; opacity: 0; visibility: hidden; pointer-events: none; }
 .draft-help-wrap:hover .draft-help-tip, .draft-help-wrap:focus-within .draft-help-tip { opacity: 1; visibility: visible; }
 .draft-preview { margin-top: 28px; }
 .draft-error { margin-bottom: 14px; color: var(--accent); }
-.reward-editor, .reference-editor, .agent-generate { display: grid; gap: 14px; }
-.reward-editor > p, .reference-editor > p, .agent-generate p, .draft-small-note { color: var(--muted); font-size: .9rem; line-height: 1.55; }
+.reward-editor, .reference-editor { display: grid; gap: 14px; }
+.reward-editor > p, .reference-editor > p, .draft-small-note { color: var(--muted); font-size: .9rem; line-height: 1.55; }
 .reward-grid { border-top: 1px solid var(--line); }
 .reward-row { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr); align-items: end; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
 .reward-row strong { padding-bottom: 14px; }
 .reward-row label, .reference-row label { display: grid; gap: 6px; margin: 0; font-size: .8rem; }
-.reference-row { display: grid; grid-template-columns: minmax(100px, .8fr) minmax(120px, 1fr) minmax(180px, 2fr) auto; align-items: end; gap: 10px; }
-.reference-row button { min-height: 48px; }
+.reference-row { display: grid; grid-template-columns: minmax(140px, .8fr) minmax(130px, 1fr) minmax(200px, 2fr) 48px; align-items: end; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--page); }
+.reference-row label { min-width: 0; font-weight: 650; }
+.reference-row :is(input, select) { display: block; width: 100%; min-width: 0; height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: .9rem; }
+.reference-remove { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.reference-remove:hover { color: var(--accent); border-color: var(--accent); }
+.reference-add { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; min-height: 44px; white-space: nowrap; }
 .reference-editor h3 { font-size: 1.1rem; font-weight: 650; }
-.agent-generate { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--page); }
-@media (max-width: 750px) { .reward-row { grid-template-columns: 1fr 1fr; } .reward-row strong { grid-column: 1 / -1; padding-bottom: 0; } .reference-row { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .reference-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } .reference-row label:nth-child(3) { grid-column: 1 / -1; } .reference-remove { justify-self: end; grid-column: 2; } }
+@media (max-width: 750px) { .reward-row { grid-template-columns: 1fr 1fr; } .reward-row strong { grid-column: 1 / -1; padding-bottom: 0; } .draft-stage-title-row { align-items: flex-start; flex-wrap: wrap; } .draft-generate-button { margin-top: 0; margin-left: auto; } }
+@media (max-width: 480px) { .reference-row { grid-template-columns: minmax(0, 1fr) 48px; } .reference-row label { grid-column: 1 / -1; } .reference-remove { grid-column: 2; } }
 .profile-page { padding-block: 40px 100px; }
 .profile-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 28px; margin-top: 30px; }
 .profile-nav { display: grid; align-content: start; gap: 5px; }

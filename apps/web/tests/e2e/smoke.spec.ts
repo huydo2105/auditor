@@ -342,7 +342,7 @@ test("team draft wizard previews locally and shows saved state only after API su
       agentContext: "Use the pinned source revision.", agentRules: "Stay within contracts/Vault.sol.",
     }) });
   });
-  await page.getByRole("button", { name: "Generate agent setup with AI" }).click();
+  await page.getByRole("button", { name: "Generate with AI" }).click();
   await expect(page.getByRole("textbox", { name: /Agent-readable setup/ })).toHaveValue("Use the pinned source revision.");
   await page.getByRole("textbox", { name: /Agent permissions and tool limits/ }).fill("Stay within the authorized source.");
   await page.getByRole("button", { name: /Preview unsaved draft/ }).click();
