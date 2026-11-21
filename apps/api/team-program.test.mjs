@@ -229,8 +229,8 @@ test("public scope is discoverable without opening private references or job acc
   } finally { await app.close(); }
 });
 
-test("AI setup generation requires team session and returns editable bounded text", async () => {
-  const input = { name: draft.name, sourceUrl: draft.sourceUrl, sourceRevision: draft.sourceRevision,
+test("AI setup generation needs no wallet but enforces origin, field, input, and rate limits", async () => {
+  const input = { field: "agentContext", name: draft.name, sourceUrl: draft.sourceUrl, sourceRevision: draft.sourceRevision,
     chain: draft.chain, permittedTargets: draft.permittedTargets.join("\n"), instructions: draft.rules,
     invariants: "No zero shares", exclusions: draft.exclusions, policy: "Local tests only",
     additionalContext: JSON.stringify({ rewards: draft.rewardTiers, references: draft.references }) };
@@ -238,27 +238,30 @@ test("AI setup generation requires team session and returns editable bounded tex
   const app = createApiServer({ token, teamAccounts: [owner.account],
     lookupAccountInfo: async account => identities.get(account) ?? null,
     generateSetup: async context => { calls++; assert.deepEqual(context, input);
-      return { agentContext: "Run local tests.", agentRules: "Stay in scope." }; } });
+      return { value: "Run local tests." }; } });
   await new Promise(resolve => app.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${app.address().port}`;
   try {
-    const o = await login(base, owner);
-    const r = await login(base, researcher);
-    assert.equal((await call(base, "/v1/programs/agent-setup", null, input)).status, 403);
-    assert.equal((await call(base, "/v1/programs/agent-setup", r, input)).status, 403);
-    assert.equal((await call(base, "/v1/programs/agent-setup", o,
+    assert.equal((await fetch(`${base}/v1/programs/agent-setup`, { method: "POST",
+      headers: { origin: "https://other.example", "content-type": "application/json" },
+      body: JSON.stringify(input) })).status, 403);
+    assert.equal((await call(base, "/v1/programs/agent-setup", null,
       { ...input, sourceRevision: "unbounded" })).status, 400);
-    const generated = await call(base, "/v1/programs/agent-setup", o, input);
+    assert.equal((await call(base, "/v1/programs/agent-setup", null,
+      { ...input, field: "other" })).status, 400);
+    const generated = await call(base, "/v1/programs/agent-setup", null, input);
     assert.equal(generated.status, 200);
-    assert.equal(generated.data.agentRules, "Stay in scope.");
-    assert.equal(calls, 1);
+    assert.equal(generated.data.value, "Run local tests.");
+    for (let i = 0; i < 4; i++) assert.equal((await call(base, "/v1/programs/agent-setup", null, input)).status, 200);
+    assert.equal((await call(base, "/v1/programs/agent-setup", null, input)).status, 429);
+    assert.equal(calls, 5);
   } finally { await new Promise(resolve => app.close(resolve)); }
   await assert.rejects(() => generateAgentSetup(input, { apiKey: "" }), { status: 503 });
   const generated = await generateAgentSetup(input, { apiKey: "test-key", fetcher: async (_url, options) => {
     assert.equal(options.headers.authorization, "Bearer test-key");
     assert.equal(JSON.parse(options.body).store, false);
     return { ok: true, json: async () => ({ status: "completed", output: [{ content: [{ type: "output_text",
-      text: JSON.stringify({ agentContext: "Check pinned source.", agentRules: "Local only." }) }] }] }) };
+      text: JSON.stringify({ value: "Check pinned source." }) }] }] }) };
   } });
-  assert.equal(generated.agentContext, "Check pinned source.");
+  assert.equal(generated.value, "Check pinned source.");
 });

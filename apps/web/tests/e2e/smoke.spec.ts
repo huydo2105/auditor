@@ -330,8 +330,6 @@ test("team draft wizard previews locally and shows saved state only after API su
   await expect(page.getByRole("complementary", { name: "Program draft preview" })).toContainText("Sample vault review");
   expect(posts).toEqual([]);
   const id = "11111111-1111-4111-8111-111111111111";
-  await page.route("**/v1/auth/me", route => route.fulfill({ status: 200, contentType: "application/json",
-    body: JSON.stringify({ authenticated: true, account: "test-owner", csrfToken: "csrf" }) }));
   await page.route("**/v1/programs/agent-setup", async route => {
     const body = route.request().postDataJSON();
     expect(body.name).toBe("Sample vault review");
@@ -339,13 +337,19 @@ test("team draft wizard previews locally and shows saved state only after API su
     expect(body.additionalContext).toContain("Vault library");
     expect(body.additionalContext).not.toContain("researcherAccount");
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
-      agentContext: "Use the pinned source revision.", agentRules: "Stay within contracts/Vault.sol.",
+      value: body.field === "agentContext" ? "Use the pinned source revision." : "Stay within contracts/Vault.sol.",
     }) });
   });
-  await page.getByRole("button", { name: "Generate with AI" }).click();
+  await page.getByRole("button", { name: "Generate with AI for Agent-readable setup" }).click();
   await expect(page.getByRole("textbox", { name: /Agent-readable setup/ })).toHaveValue("Use the pinned source revision.");
+  await page.getByRole("button", { name: "Generate with AI for Agent permissions and tool limits" }).click();
+  await expect(page.getByRole("textbox", { name: /Agent permissions and tool limits/ })).toHaveValue("Stay within contracts/Vault.sol.");
+  expect(posts).toHaveLength(2);
+  expect(posts.every(url => url.endsWith("/v1/programs/agent-setup"))).toBe(true);
   await page.getByRole("textbox", { name: /Agent permissions and tool limits/ }).fill("Stay within the authorized source.");
   await page.getByRole("button", { name: /Preview unsaved draft/ }).click();
+  await page.route("**/v1/auth/me", route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ authenticated: true, account: "test-owner", csrfToken: "csrf" }) }));
   await page.route("**/v1/programs", async route => {
     expect(route.request().headers()["x-veripoc-csrf"]).toBe("csrf");
     const body = route.request().postDataJSON();

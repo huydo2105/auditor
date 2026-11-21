@@ -196,6 +196,19 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
       if (bucket.count > (req.method === "POST" ? 30 : 120)) return json(res, 429, { error: "rate limit exceeded" });
       if (req.headers.authorization) return json(res, 401, { error: "wallet session required" });
       try {
+        if (path === "/v1/programs/agent-setup" && req.method === "POST") {
+          if (!walletAuth.isOriginAllowed(req.headers.origin)) throw fail(403, "request origin is not allowed");
+          const input = validateAgentSetupInput(await readBody(req, 12_000));
+          const aiKey = `${req.socket.remoteAddress}:agent-setup`;
+          const previousAi = buckets.get(aiKey);
+          const aiNow = now();
+          const aiBucket = !previousAi || aiNow - previousAi.start >= 60_000
+            ? { start: aiNow, count: 0 } : previousAi;
+          aiBucket.count++;
+          buckets.set(aiKey, aiBucket);
+          if (aiBucket.count > 5) return json(res, 429, { error: "AI draft limit exceeded" });
+          return json(res, 200, await generateSetup(input));
+        }
         const account = walletAuth.accountFromCookie({ cookieHeader: req.headers.cookie, method: req.method,
           origin: req.headers.origin, csrfHeader: req.headers["x-veripoc-csrf"] });
         if (path === "/v1/programs/mine" && req.method === "GET") {
@@ -210,19 +223,6 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
         if (path === "/v1/programs/public" && req.method === "GET") {
           return json(res, 200, { programs: programStore.list().filter(item => item.visibility === "public"
             && item.status === "active").map(publicProgramView) });
-        }
-        if (path === "/v1/programs/agent-setup" && req.method === "POST") {
-          if (!account || !teamAccounts.includes(account)) throw fail(403, "team account required");
-          const input = validateAgentSetupInput(await readBody(req, 12_000));
-          const aiKey = `${account}:agent-setup`;
-          const previousAi = buckets.get(aiKey);
-          const aiNow = now();
-          const aiBucket = !previousAi || aiNow - previousAi.start >= 60_000
-            ? { start: aiNow, count: 0 } : previousAi;
-          aiBucket.count++;
-          buckets.set(aiKey, aiBucket);
-          if (aiBucket.count > 5) return json(res, 429, { error: "AI draft limit exceeded" });
-          return json(res, 200, await generateSetup(input));
         }
         if (path === "/v1/programs" && req.method === "POST") {
           if (!account || !teamAccounts.includes(account)) throw fail(403, "team account required");

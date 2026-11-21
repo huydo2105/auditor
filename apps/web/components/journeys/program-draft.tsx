@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, LockKeyhole, Plus, Trash2 } from "lucide-react";
 import { publishProgram, type ReferenceInput, type RewardInput } from "@/lib/publish-program";
-import { ensureWalletSession } from "@/lib/wallet-session";
 
 type Field = { key: string; label: string; hint: string; multiline?: boolean; required?: boolean; type?: string };
 const steps: { title: string; intro: string; fields: Field[] }[] = [
@@ -37,7 +36,7 @@ const steps: { title: string; intro: string; fields: Field[] }[] = [
   { title: "Links", intro: "Add named source, documentation, or deployment references. Extra links do not expand the permitted scope.", fields: [
     { key: "docsUrl", label: "Technical documentation URL", hint: "https://docs.example.org", type: "url" },
   ] },
-  { title: "Agent setup", intro: "Generate an editable draft from the preceding steps or write your own. Generation sends those details to the configured OpenAI API; review the result before publishing.", fields: [
+  { title: "Agent setup", intro: "Generate either field from the preceding steps or write your own. AI drafting sends those details to the configured OpenAI API without wallet sign-in; review the result before publishing.", fields: [
     { key: "agentContext", label: "Agent-readable setup", hint: "Build and test commands, pinned tool versions, dependencies, and source links.", multiline: true },
     { key: "agentRules", label: "Agent permissions and tool limits", hint: "Specify allowed local tools and network behavior. Do not provide production credentials or authority outside scope.", multiline: true },
   ] },
@@ -54,7 +53,8 @@ export function ProgramDraft() {
   const [error, setError] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState("");
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGenerating] = useState<"agentContext" | "agentRules" | null>(null);
+  const [generationError, setGenerationError] = useState<{ field: string; message: string } | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const current = steps[step];
   const fieldsFor = (index: number) => steps[index].fields.filter(field =>
@@ -62,7 +62,7 @@ export function ProgramDraft() {
   function changed(key: string, value: string) {
     setValues(previous => ({ ...previous, [key]: value,
       ...(key === "visibility" && value === "public" ? { researcherAccount: "", agentBadge: "" } : {}) }));
-    setReviewed(false); setSavedId(null); setPublishError("");
+    setReviewed(false); setSavedId(null); setPublishError(""); setGenerationError(null);
   }
   function next(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -81,24 +81,24 @@ export function ProgramDraft() {
     setReferences(current => current.map((item, i) => i === index ? { ...item, [key]: value } : item));
     setReviewed(false); setSavedId(null);
   }
-  async function generateSetup() {
-    setGenerating(true); setError("");
+  async function generateSetup(field: "agentContext" | "agentRules") {
+    setGenerating(field); setGenerationError(null);
     try {
-      const session = await ensureWalletSession();
       const additionalContext = { submissionFormat: values.submission ?? "", eligibility: values.eligibility ?? "",
         docsUrl: values.docsUrl ?? "", runLimit: values.runLimit ?? "", rewards, references };
-      const response = await fetch("/v1/programs/agent-setup", { method: "POST", credentials: "same-origin",
-        headers: { "content-type": "application/json", "x-veripoc-csrf": session.csrfToken },
-        body: JSON.stringify({ name: values.name, sourceUrl: values.sourceUrl, sourceRevision: values.sourceRevision,
+      const response = await fetch("/v1/programs/agent-setup", { method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ field, name: values.name, sourceUrl: values.sourceUrl, sourceRevision: values.sourceRevision,
           chain: values.chain, permittedTargets: values.scope, instructions: values.instructions,
           invariants: values.invariants ?? "", exclusions: values.outOfScope ?? "", policy: values.policy ?? "",
           additionalContext: JSON.stringify(additionalContext) }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI draft is unavailable.");
-      setValues(previous => ({ ...previous, agentContext: result.agentContext, agentRules: result.agentRules }));
+      if (typeof result.value !== "string") throw new Error("AI draft is unavailable.");
+      setValues(previous => ({ ...previous, [field]: result.value }));
       setReviewed(false); setSavedId(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "AI draft is unavailable."); }
-    finally { setGenerating(false); }
+    } catch (cause) { setGenerationError({ field, message: cause instanceof Error ? cause.message : "AI draft is unavailable." }); }
+    finally { setGenerating(null); }
   }
   async function publish() {
     setPublishing(true);
@@ -112,14 +112,15 @@ export function ProgramDraft() {
     <div className="section-head"><h1>Create a bug bounty project</h1><p>Build clear instructions and an authorized scope for independent researchers and their AI agents. Preview the draft, then publish it with your Concordium team account.</p></div>
     <div className="draft-wizard">
       <nav aria-label="Draft sections" className="draft-steps">{steps.map((item, index) => <button type="button" key={item.title} className="focus-ring" aria-current={step === index ? "step" : undefined} onClick={() => { setStep(index); setReviewed(false); setError(""); }}><span>{index < step ? <Check size={15} aria-hidden="true" /> : String(index + 1).padStart(2, "0")}</span>{item.title}</button>)}</nav>
-      <div className="draft-stage"><div className="draft-stage-heading"><span>STEP {String(step + 1).padStart(2, "0")} OF {String(steps.length).padStart(2, "0")}</span><div className="draft-stage-title-row"><h2>{current.title}</h2>{current.title === "Agent setup" && <button type="button" className="draft-generate-button focus-ring" disabled={generating} onClick={generateSetup}>{generating ? "Generating…" : "Generate with AI"}</button>}</div><p>{current.intro}</p></div>
+      <div className="draft-stage"><div className="draft-stage-heading"><span>STEP {String(step + 1).padStart(2, "0")} OF {String(steps.length).padStart(2, "0")}</span><h2>{current.title}</h2><p>{current.intro}</p></div>
         {error && <p role="alert" className="text-sm text-forest">{error}</p>}
         <form className="draft-form" onSubmit={next} key={current.title}>{fieldsFor(step).map(field => <div className="draft-field" key={field.key}>
-          <div className="draft-field-title"><label htmlFor={field.key}>{field.label}{field.required && <span className="sr-only"> (required)</span>}</label><span className="draft-help-wrap"><button type="button" className="draft-help focus-ring" aria-label={`Help for ${field.label}`} aria-describedby={`${field.key}-help`}>*</button><span className="draft-help-tip" id={`${field.key}-help`} role="tooltip">{field.hint}</span></span></div>
+          <div className={`draft-field-title${current.title === "Agent setup" ? " draft-field-title-action" : ""}`}><label htmlFor={field.key}>{field.label}{field.required && <span className="sr-only"> (required)</span>}</label><span className="draft-help-wrap"><button type="button" className="draft-help focus-ring" aria-label={`Help for ${field.label}`} aria-describedby={`${field.key}-help`}>*</button><span className="draft-help-tip" id={`${field.key}-help`} role="tooltip">{field.hint}</span></span>{current.title === "Agent setup" && <button type="button" className="draft-generate-button focus-ring" disabled={Boolean(generating)} onClick={() => generateSetup(field.key as "agentContext" | "agentRules")}>{generating === field.key ? "Generating…" : "Generate with AI"}<span className="sr-only"> for {field.label}</span></button>}</div>
           {field.key === "chain" ? <select id={field.key} value={values.chain ?? ""} required onChange={event => changed(field.key, event.target.value)}><option value="">Choose environment</option><option value="evm-local">EVM local</option><option value="evm-testnet">EVM testnet</option><option value="solana-testnet">Solana testnet</option></select>
             : field.key === "visibility" ? <select id={field.key} value={values.visibility} onChange={event => changed(field.key, event.target.value)}><option value="private">Private — invitation required</option><option value="public">Public — scope visible to everyone</option></select>
             : field.multiline ? <textarea id={field.key} value={values[field.key] ?? ""} onChange={event => changed(field.key, event.target.value)} required={field.required} maxLength={2000} rows={5} placeholder={`Enter ${field.label.toLowerCase()}`} />
               : <input id={field.key} type={field.type ?? "text"} min={field.key === "runLimit" ? 1 : undefined} max={field.key === "runLimit" ? 20 : undefined} value={values[field.key] ?? ""} onChange={event => changed(field.key, event.target.value)} required={field.required} maxLength={300} placeholder={`Enter ${field.label.toLowerCase()}`} />}
+          {generationError?.field === field.key && <p role="alert" className="draft-error">{generationError.message}</p>}
         </div>)}
           {current.title === "Rewards" && <div className="reward-editor"><p>Proposed reward ranges in USD. Zero means no reward is offered for that severity.</p><div className="reward-grid" role="group" aria-label="Severity reward ranges">{rewards.map((item, index) => <div key={item.severity} className="reward-row"><strong>{severities[index]}</strong><label>Minimum USD<input type="number" min="0" max="100000000" value={item.min} onChange={event => rewardChanged(index, "min", event.target.value)} /></label><label>Maximum USD<input type="number" min="0" max="100000000" value={item.max} onChange={event => rewardChanged(index, "max", event.target.value)} /></label></div>)}</div><p className="draft-small-note">These ranges guide human review; they do not authorize a payout.</p></div>}
           {current.title === "Links" && <div className="reference-editor"><h3>Additional references</h3><p>Use named rows for source repositories, documentation, or deployed addresses.</p>{references.map((reference, index) => <div key={index} className="reference-row"><label>Type<select value={reference.kind} onChange={event => referenceChanged(index, "kind", event.target.value as ReferenceInput["kind"])}><option value="source">Source</option><option value="documentation">Documentation</option><option value="deployment">Deployment</option></select></label><label>Name<input value={reference.name} onChange={event => referenceChanged(index, "name", event.target.value)} maxLength={100} required /></label><label>HTTPS link or address<input value={reference.url} onChange={event => referenceChanged(index, "url", event.target.value)} maxLength={300} required /></label><button type="button" className="reference-remove focus-ring" aria-label={`Remove reference ${index + 1}`} onClick={() => { setReferences(items => items.filter((_, i) => i !== index)); setReviewed(false); setSavedId(null); }}><Trash2 size={16} aria-hidden="true" /></button></div>)}<button type="button" className="draft-back reference-add focus-ring" disabled={references.length >= 12} onClick={() => { setReferences(items => [...items, { kind: "source", name: "", url: "" }]); setReviewed(false); setSavedId(null); }}><Plus size={16} aria-hidden="true" /> Add reference</button></div>}
