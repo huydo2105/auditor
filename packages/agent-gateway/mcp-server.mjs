@@ -8,7 +8,7 @@ export const MCP_PROTOCOL_VERSION = "2024-11-05";
 export const MCP_TOOLS = [
   {
     name: "get_program_scope",
-    description: "Read the authorized scope, pinned source revision, and rules for an invited VeriPoC audit program.",
+    description: "Read the authorized scope, pinned source revision, and rules for an invited Auditor audit program.",
     inputSchema: {
       type: "object",
       properties: {
@@ -113,7 +113,7 @@ export function createMcpHandler(client) {
         result: {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: { tools: {} },
-          serverInfo: { name: "veripoc-agent-gateway", version: "0.1.0" },
+          serverInfo: { name: "auditor-agent-gateway", version: "0.1.0" },
         },
       };
     }
@@ -169,9 +169,9 @@ export function startStdioMcpServer(client) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const client = createAgentGatewayClient({
-    apiOrigin: process.env.VERIPOC_API_ORIGIN ?? `http://127.0.0.1:${process.env.VERIPOC_PORT ?? 8787}`,
-    badge: process.env.VERIPOC_AGENT_BADGE,
-    domain: process.env.VERIPOC_AGENT_DOMAIN,
+    apiOrigin: process.env.AUDITOR_API_ORIGIN ?? `http://127.0.0.1:${process.env.AUDITOR_PORT ?? 8787}`,
+    badge: process.env.AUDITOR_AGENT_BADGE,
+    domain: process.env.AUDITOR_AGENT_DOMAIN,
     privateKey: process.env.EVM_PRIVATE_KEY,
   });
   startStdioMcpServer(client);

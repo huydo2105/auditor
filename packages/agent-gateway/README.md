@@ -1,6 +1,6 @@
-# VeriPoC BYO Research Agent Gateway (REST & MCP)
+# Auditor BYO Research Agent Gateway (REST & MCP)
 
-Allows an invited security researcher to connect their own AI agent (Claude Code, Cursor, Codex, or a custom script) to VeriPoC's bounded verification API using Issue #12 signed CIS-8 / CIS-8004 requests.
+Allows an invited security researcher to connect their own AI agent (Claude Code, Cursor, Codex, or a custom script) to Auditor's bounded verification API using Issue #12 signed CIS-8 / CIS-8004 requests.
 
 ## Exposed Operations
 
@@ -14,30 +14,30 @@ Both the REST client (`client.mjs`) and the stdio MCP server (`mcp-server.mjs`) 
 | `get_job_status` | `GET /v1/programs/:programId/jobs/:jobId` | Poll `queued` / `running` / `finished` status |
 | `get_verification_evidence` | `GET /v1/programs/:programId/jobs/:jobId/evidence` | Read the private Foundry verdict, balance deltas, and SHA-256 receipt |
 
-Every call is signed locally with the agent's CIS-8 bound key (`EVM_PRIVATE_KEY` never leaves the researcher's machine). The VeriPoC API enforces invitation, active badge + Agent Card SHA-256 integrity, single-use nonce, 5-minute expiry, idempotency, and per-program run quota.
+Every call is signed locally with the agent's CIS-8 bound key (`EVM_PRIVATE_KEY` never leaves the researcher's machine). The Auditor API enforces invitation, active badge + Agent Card SHA-256 integrity, single-use nonce, 5-minute expiry, idempotency, and per-program run quota.
 
 ## Running Locally (MCP Stdio)
 
-1. Start the VeriPoC local API with the agent's badge invited:
+1. Start the Auditor local API with the agent's badge invited:
    ```powershell
-   $env:VERIPOC_API_TOKEN = "<32+ char token>"
-   $env:VERIPOC_TEAM_TOKEN = "<32+ char token>"
-   $env:VERIPOC_RESEARCHER_TOKEN = "<32+ char token>"
-   $env:VERIPOC_AGENT_DOMAIN = "veripoc.local"
-   $env:VERIPOC_INVITED_AGENT_BADGES = "JyP9UhUtd9AeJywDRsg5q"
+   $env:AUDITOR_API_TOKEN = "<32+ char token>"
+   $env:AUDITOR_TEAM_TOKEN = "<32+ char token>"
+   $env:AUDITOR_RESEARCHER_TOKEN = "<32+ char token>"
+   $env:AUDITOR_AGENT_DOMAIN = "auditor.local"
+   $env:AUDITOR_INVITED_AGENT_BADGES = "JyP9UhUtd9AeJywDRsg5q"
    npm run api:dev
    ```
 2. Configure your MCP client (e.g., Claude Desktop / Cursor / Codex) to launch the stdio server:
    ```json
    {
      "mcpServers": {
-       "veripoc": {
+       "auditor": {
          "command": "node",
          "args": ["packages/agent-gateway/mcp-server.mjs"],
          "env": {
-           "VERIPOC_API_ORIGIN": "http://127.0.0.1:8787",
-           "VERIPOC_AGENT_BADGE": "JyP9UhUtd9AeJywDRsg5q",
-           "VERIPOC_AGENT_DOMAIN": "veripoc.local",
+           "AUDITOR_API_ORIGIN": "http://127.0.0.1:8787",
+           "AUDITOR_AGENT_BADGE": "JyP9UhUtd9AeJywDRsg5q",
+           "AUDITOR_AGENT_DOMAIN": "auditor.local",
            "EVM_PRIVATE_KEY": "0x..."
          }
        }

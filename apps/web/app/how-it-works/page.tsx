@@ -13,7 +13,7 @@ export default function HowItWorksPage() {
         </li>
         <li>
           <h2>2. Connect or copy agent credentials and brief <span className="status-chip">Live locally</span></h2>
-          <p>Copy the bounded researcher brief or connect your own AI agent through VeriPoC&apos;s signed REST/MCP gateway (<code>packages/agent-gateway/mcp-server.mjs</code>) using your invited Concordium CIS-8/CIS-8004 key.</p>
+          <p>Copy the bounded researcher brief or connect your own AI agent through Auditor&apos;s signed REST/MCP gateway (<code>packages/agent-gateway/mcp-server.mjs</code>) using your invited Concordium CIS-8/CIS-8004 key.</p>
         </li>
         <li>
           <h2>3. Investigate with your own tools <span className="status-chip">Researcher-owned</span></h2>

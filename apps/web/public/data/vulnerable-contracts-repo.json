@@ -1,17 +1,17 @@
 {
-  "id": "veripoc-vulnerable-contracts",
-  "name": "VeriPoC Vulnerable Contracts Lab",
+  "id": "auditor-vulnerable-contracts",
+  "name": "Auditor Vulnerable Contracts Lab",
   "visibility": "private",
   "depositCcd": 100,
   "contacts": [
-    { "channel": "github", "value": "https://github.com/huydo2105/veripoc-vulnerable-contracts" },
-    { "channel": "x", "value": "https://x.com/veripoc" },
-    { "channel": "discord", "value": "https://discord.gg/veripoc" }
+    { "channel": "github", "value": "https://github.com/huydo2105/auditor-vulnerable-contracts" },
+    { "channel": "x", "value": "https://x.com/auditor" },
+    { "channel": "discord", "value": "https://discord.gg/auditor" }
   ],
   "invitedAgentBadges": [
     "JyP9UhUtd9AeJywDRsg5q"
   ],
-  "sourceUrl": "https://github.com/huydo2105/veripoc-vulnerable-contracts",
+  "sourceUrl": "https://github.com/huydo2105/auditor-vulnerable-contracts",
   "sourceRevision": "361349bae6c0b77bcdd7f66c2504063bbdab40a4",
   "chain": "evm-local",
   "runLimit": 10,
@@ -32,19 +32,19 @@
     { "severity": "high", "min": 2500, "max": 10000 },
     { "severity": "medium", "min": 500, "max": 2500 }
   ],
-  "docsUrl": "https://github.com/huydo2105/veripoc-vulnerable-contracts#readme",
+  "docsUrl": "https://github.com/huydo2105/auditor-vulnerable-contracts#readme",
   "references": [
     {
       "kind": "source",
       "name": "Vulnerable contracts repository",
-      "url": "https://github.com/huydo2105/veripoc-vulnerable-contracts/tree/361349bae6c0b77bcdd7f66c2504063bbdab40a4"
+      "url": "https://github.com/huydo2105/auditor-vulnerable-contracts/tree/361349bae6c0b77bcdd7f66c2504063bbdab40a4"
     },
     {
       "kind": "documentation",
       "name": "Fixture README and invariants",
-      "url": "https://github.com/huydo2105/veripoc-vulnerable-contracts/blob/361349bae6c0b77bcdd7f66c2504063bbdab40a4/README.md"
+      "url": "https://github.com/huydo2105/auditor-vulnerable-contracts/blob/361349bae6c0b77bcdd7f66c2504063bbdab40a4/README.md"
     }
   ],
-  "agentContext": "Compiler: solc 0.8.24 (foundry.toml). Clone https://github.com/huydo2105/veripoc-vulnerable-contracts at commit 361349bae6c0b77bcdd7f66c2504063bbdab40a4 and run `forge build` and `forge test -vvv` locally.",
+  "agentContext": "Compiler: solc 0.8.24 (foundry.toml). Clone https://github.com/huydo2105/auditor-vulnerable-contracts at commit 361349bae6c0b77bcdd7f66c2504063bbdab40a4 and run `forge build` and `forge test -vvv` locally.",
   "agentRules": "Operate strictly offline against local Foundry forks. Only inspect files under contracts/. Do not broadcast transactions to live networks or modify files outside the local test harness."
 }

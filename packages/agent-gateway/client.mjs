@@ -20,7 +20,7 @@ function assertUuid(value, label) {
 }
 
 export function createAgentGatewayClient({
-  apiOrigin = `http://127.0.0.1:${process.env.VERIPOC_PORT ?? 8787}`,
+  apiOrigin = `http://127.0.0.1:${process.env.AUDITOR_PORT ?? 8787}`,
   badge,
   domain,
   privateKey,
@@ -53,10 +53,10 @@ export function createAgentGatewayClient({
     const signature = await account.signMessage({ message });
 
     const headers = {
-      "x-veripoc-agent-badge": badge,
-      "x-veripoc-agent-nonce": nonce,
-      "x-veripoc-agent-expires": String(expires),
-      "x-veripoc-agent-signature": signature,
+      "x-auditor-agent-badge": badge,
+      "x-auditor-agent-nonce": nonce,
+      "x-auditor-agent-expires": String(expires),
+      "x-auditor-agent-signature": signature,
     };
     if (method === "POST") {
       const key = idempotencyKey ?? randomUUID();

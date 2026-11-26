@@ -9,7 +9,7 @@ import { createMcpHandler, MCP_PROTOCOL_VERSION } from "./mcp-server.mjs";
 const token = "gateway-operator-token-with-thirty-two-chars-000001";
 const teamToken = "gateway-team-token-with-at-least-thirty-two-chars-02";
 const researcherToken = "gateway-researcher-token-with-thirty-two-chars-0003";
-const DOMAIN = "veripoc.local";
+const DOMAIN = "auditor.local";
 
 const invitedKey = "0x1111111111111111111111111111111111111111111111111111111111111111";
 const otherInvitedKey = "0x2222222222222222222222222222222222222222222222222222222222222222";
@@ -30,13 +30,13 @@ function registryFixture(badge, privateKey, owner = "43fN3v9K7sP6aR2uT1wX8yZ5cB4
       card_sha256: cardHash,
       checks: { hash_matches_on_chain: true },
       expected: { chain: "ccd:4221332d34e1694168c2a0c0b3fd0f27", contracts: { cis8004: "12802,0", cis8: "12801,0" } },
-      on_chain: { status: "Active", agent_uri: "https://veripoc.example/.well-known/agent-card.json", owner_account: owner, metadata_hash_hex: cardHash },
+      on_chain: { status: "Active", agent_uri: "https://auditor.example/.well-known/agent-card.json", owner_account: owner, metadata_hash_hex: cardHash },
     },
     agent: {
       network: "testnet",
       token_address: badge,
       status: "Active",
-      agent_uri: "https://veripoc.example/.well-known/agent-card.json",
+      agent_uri: "https://auditor.example/.well-known/agent-card.json",
       owner_account: owner,
       metadata_hash_hex: cardHash,
       external_reference: {
