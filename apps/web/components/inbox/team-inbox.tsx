@@ -118,6 +118,8 @@ export function TeamInbox() {
   const [noteDecision, setNoteDecision] = useState<TriageDecision>("accept");
   const [notePatch, setNotePatch] = useState("");
   const [triageRationale, setTriageRationale] = useState("");
+  const [settleAmount, setSettleAmount] = useState("25");
+  const [settleTerms, setSettleTerms] = useState<{ amount: string; asset: string; network: string; recipient: string; memo: string } | null>(null);
   const [busyAction, setBusyAction] = useState("");
   const [actionMessage, setActionMessage] = useState("");
 
@@ -282,6 +284,38 @@ export function TeamInbox() {
         return;
       }
       setActionMessage(`Anchored on Concordium Testnet (${json.anchor?.txHash?.slice(0, 12)}…).`);
+      await loadInbox();
+    } catch {
+      setError("Verification API is unavailable.");
+    } finally {
+      setBusyAction("");
+    }
+  }
+
+  async function requestX402Settle() {
+    if (!activeSubmission) return;
+    setBusyAction("settle");
+    setActionMessage("");
+    setError("");
+    setSettleTerms(null);
+    try {
+      const res = await fetch(`/v1/programs/demo-vault/submissions/${activeSubmission.id}/settle`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { ...authHeaders(), "content-type": "application/json", "idempotency-key": nextKey("settle") },
+        body: JSON.stringify({ amount: Number(settleAmount) }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 402 && json.x402) {
+        setSettleTerms(json.x402);
+        setActionMessage(`HTTP 402 Payment Required: pay ${json.x402.amount} ${json.x402.asset} and retry with X-PAYMENT.`);
+        return;
+      }
+      if (!res.ok) {
+        setError(json.error || "Unable to request x402 settlement.");
+        return;
+      }
+      setActionMessage(`x402 reward settled (${json.settlement?.txHash?.slice(0, 12)}…).`);
       await loadInbox();
     } catch {
       setError("Verification API is unavailable.");
@@ -543,6 +577,47 @@ export function TeamInbox() {
                             <button type="button" className="report-secondary focus-ring" disabled={Boolean(busyAction)} onClick={() => void triggerPatchRetest()}>Run PatchedVault retest</button>
                           </div>
                         </div>
+                      )}
+                    </div>
+                  </li>
+
+                  <li className="timeline-step">
+                    <Coins size={16} aria-hidden="true" />
+                    <div>
+                      <strong>5. Testnet x402 Reward Settlement</strong>
+                      {activeSubmission.settlement?.settled ? (
+                        <p className="mono-data">
+                          Settled {activeSubmission.settlement.amount} {activeSubmission.settlement.asset} ·{" "}
+                          {activeSubmission.settlement.explorerUrl ? (
+                            <a href={activeSubmission.settlement.explorerUrl} target="_blank" rel="noopener noreferrer">
+                              {activeSubmission.settlement.txHash.slice(0, 16)}…
+                            </a>
+                          ) : activeSubmission.settlement.txHash.slice(0, 16)}
+                        </p>
+                      ) : (
+                        <>
+                          <p>Requires both a finished reproduced exploit receipt and a patched not_reproduced receipt.</p>
+                          {settleTerms && (
+                            <div className="advisory-note-box mono-data">
+                              <span>402 Challenge: {settleTerms.amount} {settleTerms.asset} → {settleTerms.recipient.slice(0, 16)}… · memo {settleTerms.memo.slice(0, 16)}…</span>
+                            </div>
+                          )}
+                          {data.actor.role === "team" && (
+                            <div className="inbox-subform-row mt-2">
+                              <input
+                                type="number"
+                                min="1"
+                                max="100"
+                                aria-label="Testnet CCD reward amount"
+                                value={settleAmount}
+                                onChange={e => setSettleAmount(e.target.value)}
+                              />
+                              <button type="button" className="report-secondary focus-ring" disabled={Boolean(busyAction)} onClick={() => void requestX402Settle()}>
+                                Request x402 settlement
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </li>

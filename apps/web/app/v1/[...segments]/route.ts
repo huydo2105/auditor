@@ -31,7 +31,7 @@ async function forward(request: Request, context: Context, method: "GET" | "POST
       || (method === "GET" && segments.length === 4 && segments[2] === "jobs" && jobId.test(segments[3]))
       || (method === "GET" && segments.length === 5 && segments[2] === "jobs" && jobId.test(segments[3]) && ["evidence", "anchor"].includes(segments[4]))
       || (method === "POST" && segments.length === 5 && segments[2] === "jobs" && jobId.test(segments[3]) && segments[4] === "anchor")
-      || (method === "POST" && segments.length === 5 && segments[2] === "submissions" && jobId.test(segments[3]) && ["jobs", "agent-note", "triage", "patch-retest"].includes(segments[4]))
+      || (method === "POST" && segments.length === 5 && segments[2] === "submissions" && jobId.test(segments[3]) && ["jobs", "agent-note", "triage", "patch-retest", "settle"].includes(segments[4]))
     ) ? `/v1/${segments.join("/")}` : null;
   if (!path) return error(404, "not found");
 
@@ -41,7 +41,7 @@ async function forward(request: Request, context: Context, method: "GET" | "POST
   if (!origin) return error(503, "verification API is not configured");
 
   const headers = new Headers();
-  for (const name of ["authorization", "content-type", "idempotency-key", "cookie", "origin", "x-auditor-csrf"]) {
+  for (const name of ["authorization", "content-type", "idempotency-key", "cookie", "origin", "x-auditor-csrf", "x-payment"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -73,6 +73,8 @@ async function forward(request: Request, context: Context, method: "GET" | "POST
     const responseHeaders = new Headers({ ...noStore, "content-type": "application/json; charset=utf-8" });
     const setCookie = response.headers.get("set-cookie");
     if (setCookie) responseHeaders.set("set-cookie", setCookie);
+    const paymentRequired = response.headers.get("x-payment-required");
+    if (paymentRequired) responseHeaders.set("x-payment-required", paymentRequired);
     return new Response(await response.text(), { status: response.status, headers: responseHeaders });
   } catch { return error(502, "verification API is unavailable"); }
 }

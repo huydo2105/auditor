@@ -103,6 +103,20 @@ export function buildInboxPayload({ submissions, jobs, actor }) {
       });
     }
 
+    if (sub.settlement?.settled) {
+      items.push({
+        id: `payment:${sub.settlement.txHash}`,
+        category: "payment",
+        programId: sub.programId,
+        submissionId: sub.id,
+        title: `x402 Settlement: ${sub.settlement.amount} ${sub.settlement.asset}`,
+        summary: `Tx ${sub.settlement.txHash.slice(0, 16)}… on ${sub.settlement.network}`,
+        actorId: sub.settlement.payer || sub.triage?.decidedBy || "team",
+        createdAt: sub.settlement.settledAt,
+        status: "settled",
+      });
+    }
+
     for (const job of subJobs) {
       if (job.isPatchRetest) {
         items.push({

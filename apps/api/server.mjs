@@ -12,6 +12,7 @@ import { generateAgentSetup, validateAgentSetupInput } from "./agent-setup.mjs";
 import { buildInboxPayload, validateAdvisoryNote, validateTriageDecision } from "./triage.mjs";
 import { createConcordiumAnchorService } from "../../packages/core/concordium-anchor.mjs";
 import { receiptHash } from "../../packages/core/receipt.mjs";
+import { buildPaymentTerms, DEFAULT_X402_CAP, verifyConcordiumTestnetTx, verifyX402Payment } from "./x402.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = value => createHash("sha256").update(value).digest("hex");
@@ -102,7 +103,9 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
   allowedOrigins = [], teamAccounts = [], invitedResearcherAccounts = [], lookupAccountInfo,
   secureCookies = process.env.NODE_ENV === "production",
   execute = executeJob, now = Date.now, maxJobs = 16, programStorePath = null,
-  generateSetup = generateAgentSetup, anchorService = createConcordiumAnchorService() } = {}) {
+  generateSetup = generateAgentSetup, anchorService = createConcordiumAnchorService(),
+  x402Cap = Number(process.env.VERIPOC_X402_CAP ?? DEFAULT_X402_CAP),
+  verifyPaymentOnChain = verifyConcordiumTestnetTx } = {}) {
   if (typeof token !== "string" || token.length < 32) throw new Error("AUDITOR_API_TOKEN must be at least 32 characters");
   const configured = [teamToken, researcherToken].filter(value => value !== undefined);
   if (configured.some(value => typeof value !== "string" || value.length < 32)
@@ -119,6 +122,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
   let programRuns = 0;
   const buckets = new Map();
   const usedAgentNonces = new Map();
+  const usedTxHashes = new Set();
   let running = false;
   const queue = [];
   const pump = () => {
@@ -405,7 +409,8 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
         const isAdvisoryNote = segments.length === 4 && segments[1] === "submissions" && segments[3] === "agent-note";
         const isTriage = segments.length === 4 && segments[1] === "submissions" && segments[3] === "triage";
         const isPatchRetest = segments.length === 4 && segments[1] === "submissions" && segments[3] === "patch-retest";
-        if (isAdvisoryNote || isTriage || isPatchRetest) {
+        const isSettle = segments.length === 4 && segments[1] === "submissions" && segments[3] === "settle";
+        if (isAdvisoryNote || isTriage || isPatchRetest || isSettle) {
           if (actor.role !== "team") return json(res, 403, { error: "team role required" });
           const targetSub = submissions.get(segments[2]);
           if (!targetSub || targetSub.programId !== DEMO_PROGRAM.id) return json(res, 404, { error: "submission not found" });
@@ -424,6 +429,61 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
             const decision = validateTriageDecision(await readBody(req));
             targetSub.triage = { ...decision, decidedBy: actor.id, decidedAt: new Date(now()).toISOString() };
             return json(res, 200, { triage: targetSub.triage, submission: targetSub });
+          }
+          if (isSettle) {
+            if (actor.badge) return json(res, 403, { error: "human team approval required for settlement" });
+            const settleKey = req.headers["idempotency-key"];
+            if (typeof settleKey !== "string" || !/^[a-zA-Z0-9_-]{8,64}$/.test(settleKey)) throw fail(400, "valid Idempotency-Key required");
+            const settleBody = await readBody(req);
+            if (!settleBody || typeof settleBody !== "object" || Array.isArray(settleBody)) throw fail(400, "settlement payload required");
+            const settleScopeKey = `${DEMO_PROGRAM.id}:settle:${targetSub.id}:${settleKey}`;
+            const settleFingerprint = sha(JSON.stringify([DEMO_PROGRAM.id, targetSub.id, settleBody]));
+            const priorSettle = idempotency.get(settleScopeKey);
+            if (priorSettle) {
+              return priorSettle.fingerprint === settleFingerprint
+                ? json(res, 200, { settlement: targetSub.settlement, submission: targetSub })
+                : json(res, 409, { error: "idempotency key reused for a different settlement" });
+            }
+            if (targetSub.settlement?.settled) throw fail(409, "submission already settled");
+            const vulnJob = (targetSub.jobIds ?? []).map(id => jobs.get(id)).find(
+              j => j?.state === "finished" && j.result?.status === "reproduced" && j.result?.receipt,
+            );
+            const patchJob = (targetSub.patchRetestJobIds ?? []).map(id => jobs.get(id)).find(
+              j => j?.state === "finished" && j.result?.status === "not_reproduced" && j.result?.receipt,
+            );
+            if (!vulnJob || !patchJob) {
+              return json(res, 409, { error: "both finished reproduced exploit receipt and not_reproduced patch retest receipt are required before settlement" });
+            }
+            const receiptSha256 = vulnJob.result.receipt.receiptHash ?? receiptHash(vulnJob.result.receipt);
+            const patchReceiptSha256 = patchJob.result.receipt.receiptHash ?? receiptHash(patchJob.result.receipt);
+            const terms = buildPaymentTerms({
+              programId: DEMO_PROGRAM.id,
+              submissionId: targetSub.id,
+              amount: settleBody.amount,
+              recipient: settleBody.recipient,
+              receiptSha256,
+              patchReceiptSha256,
+              spendingCap: x402Cap,
+            });
+            const paymentHeader = req.headers["x-payment"];
+            if (!paymentHeader) {
+              return json(
+                res,
+                402,
+                { error: "payment required", x402: terms },
+                { "x-payment-required": Buffer.from(JSON.stringify(terms)).toString("base64") },
+              );
+            }
+            const settlement = await verifyX402Payment({
+              headerValue: paymentHeader,
+              terms,
+              usedTxHashes,
+              verifyOnChain: verifyPaymentOnChain,
+              now,
+            });
+            targetSub.settlement = settlement;
+            idempotency.set(settleScopeKey, { fingerprint: settleFingerprint, id: settlement.txHash });
+            return json(res, 200, { settlement, submission: targetSub });
           }
           if (!fixtureRevisionMatches()) return json(res, 409, { error: "reviewed fixture revision changed" });
           const retestKey = req.headers["idempotency-key"];
