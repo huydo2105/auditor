@@ -14,7 +14,7 @@
     "run:worker": "node workers/sandbox/cli.mjs",
     "api:dev": "node apps/api/start.mjs",
     "mcp:agent": "node packages/agent-gateway/mcp-server.mjs",
-    "test:api": "node --test apps/api/server.test.mjs apps/api/program.test.mjs apps/api/agent-auth.test.mjs apps/api/wallet-auth.test.mjs apps/api/team-program.test.mjs packages/agent-gateway/gateway.test.mjs",
+    "test:api": "node --test apps/api/server.test.mjs apps/api/program.test.mjs apps/api/agent-auth.test.mjs apps/api/wallet-auth.test.mjs apps/api/team-program.test.mjs apps/api/triage.test.mjs packages/agent-gateway/gateway.test.mjs",
     "test:gateway": "node --test packages/agent-gateway/gateway.test.mjs",
     "web:dev": "npm run dev --workspace @auditor/web",
     "web:build": "npm run build --workspace @auditor/web",

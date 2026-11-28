@@ -627,3 +627,87 @@ test("Concordium wallet connects and disconnects while the API is unavailable", 
   await expect(page.getByRole("button", { name: "Connect Concordium wallet" })).toBeVisible();
   expect(authPosts).toEqual([]);
 });
+
+test("private team inbox displays findings timeline, supports advisory notes, human triage, patch retest, and fits 320px", async ({ browser, baseURL }) => {
+  const operatorToken = "inbox-e2e-operator-token-thirty-two-chars-00001";
+  const teamToken = "inbox-e2e-team-token-at-least-thirty-two-chars-2";
+  const researcherToken = "inbox-e2e-researcher-token-thirty-two-chars-0003";
+  const serverOptions = {
+    token: operatorToken,
+    teamToken,
+    researcherToken,
+    execute: async (_kind: string, body: { fixture: string }) => ({
+      status: body.fixture === "vulnerable" ? "reproduced" : "not_reproduced",
+      receipt: {
+        receiptHash: body.fixture === "vulnerable" ? "d".repeat(64) : "e".repeat(64),
+        input: { sourceSha256: DEMO_PROGRAM.workerInputSha256 },
+      },
+    }),
+  };
+  const server = createApiServer(serverOptions as unknown as Parameters<typeof createApiServer>[0]);
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const apiOrigin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+
+  try {
+    // Seed a researcher submission and exploit reproduction job directly on the test API.
+    const subRes = await fetch(`${apiOrigin}/v1/programs/demo-vault/submissions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${researcherToken}`, "content-type": "application/json", "idempotency-key": "e2e-inbox-sub-1" },
+      body: JSON.stringify({ claim: "donation-share-inflation", targetSha256: DEMO_PROGRAM.targetSha256 }),
+    });
+    const sub = await subRes.json();
+    await fetch(`${apiOrigin}/v1/programs/demo-vault/submissions/${sub.id}/jobs`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${researcherToken}`, "content-type": "application/json", "idempotency-key": "e2e-inbox-job-1" },
+      body: JSON.stringify({ artifactFormat: "repo-fixture-v1", fixture: "vulnerable" }),
+    });
+    await new Promise(resolve => setTimeout(resolve, 40));
+
+    const context = await browser.newContext({ baseURL });
+    const page = await context.newPage();
+    await page.route("**/v1/**", async route => {
+      const req = route.request();
+      const url = new URL(req.url());
+      if (!url.pathname.startsWith("/v1/inbox") && !url.pathname.startsWith("/v1/programs/demo-vault")) {
+        return route.continue();
+      }
+      const headers: Record<string, string> = {};
+      for (const name of ["authorization", "content-type", "idempotency-key"]) {
+        const value = req.headers()[name];
+        if (value) headers[name] = value;
+      }
+      const upstream = await fetch(`${apiOrigin}${url.pathname}`, {
+        method: req.method(),
+        headers,
+        body: req.postData() ?? undefined,
+      });
+      return route.fulfill({
+        status: upstream.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: await upstream.text(),
+      });
+    });
+
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto("/inbox");
+    await expect(page.getByRole("heading", { name: /Findings, private receipts & triage/ })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+
+    await page.getByLabel("Local program token").fill(teamToken);
+    await page.getByRole("button", { name: "Open inbox" }).click();
+    await expect(page.getByTestId("inbox-actor-banner")).toContainText("Team Reviewer");
+
+    await page.getByLabel("Team agent advisory summary").fill("Foundry reproduced exploit cleanly.");
+    await page.getByRole("button", { name: "Post advisory note" }).click();
+    await expect(page.getByText("Foundry reproduced exploit cleanly.").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Accept", exact: true }).click();
+    await expect(page.getByText("Decision: accept")).toBeVisible();
+
+    await page.getByRole("button", { name: "Run PatchedVault retest" }).click();
+    await expect(page.getByText(/Patch retest \(patched\) → not_reproduced/).first()).toBeVisible({ timeout: 10_000 });
+    await context.close();
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
