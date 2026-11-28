@@ -153,3 +153,112 @@ test("team inbox scopes private submissions, supports advisory notes, human tria
     await close();
   }
 });
+
+test("receipt anchor endpoint enforces team role, finished job, and unconfigured honest 503", async () => {
+  const unconfigured = createApiServer({
+    token: operatorToken,
+    teamToken,
+    researcherToken,
+    anchorService: {
+      anchorReceipt: async () => ({ anchored: false, mode: "unconfigured", reason: "No Testnet credentials" }),
+    },
+    execute: async () => ({
+      status: "reproduced",
+      receipt: { receiptHash: "f".repeat(64), input: { sourceSha256: DEMO_PROGRAM.workerInputSha256 } },
+    }),
+  });
+  await new Promise(resolve => unconfigured.listen(0, "127.0.0.1", resolve));
+  const base1 = `http://127.0.0.1:${unconfigured.address().port}`;
+  try {
+    const sub = await (await fetch(`${base1}/v1/programs/demo-vault/submissions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${researcherToken}`, "content-type": "application/json", "idempotency-key": "anchor-sub-1" },
+      body: JSON.stringify({ claim: "donation-share-inflation", targetSha256: DEMO_PROGRAM.targetSha256 }),
+    })).json();
+    const job = await (await fetch(`${base1}/v1/programs/demo-vault/submissions/${sub.id}/jobs`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${researcherToken}`, "content-type": "application/json", "idempotency-key": "anchor-job-1" },
+      body: JSON.stringify({ artifactFormat: "repo-fixture-v1", fixture: "vulnerable" }),
+    })).json();
+    await new Promise(resolve => setTimeout(resolve, 40));
+
+    // Researcher cannot anchor (403).
+    const resForbidden = await fetch(`${base1}/v1/programs/demo-vault/jobs/${job.id}/anchor`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${researcherToken}`, "content-type": "application/json", "idempotency-key": "anchor-try-1" },
+      body: JSON.stringify({}),
+    });
+    assert.equal(resForbidden.status, 403);
+
+    // Unconfigured team anchor fails honestly with 503.
+    const resUnconf = await fetch(`${base1}/v1/programs/demo-vault/jobs/${job.id}/anchor`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${teamToken}`, "content-type": "application/json", "idempotency-key": "anchor-try-2" },
+      body: JSON.stringify({}),
+    });
+    assert.equal(resUnconf.status, 503);
+    assert.equal((await resUnconf.json()).mode, "unconfigured");
+  } finally {
+    await new Promise(resolve => unconfigured.close(() => resolve()));
+  }
+
+  const configured = createApiServer({
+    token: operatorToken,
+    teamToken,
+    researcherToken,
+    anchorService: {
+      anchorReceipt: async ({ sessionId, receiptSha256 }) => ({
+        anchored: true,
+        mode: "concordium-testnet",
+        network: "ccd:4221332d34e1694168c2a0c0b3fd0f27",
+        txHash: "1".repeat(64),
+        explorerUrl: `https://testnet.ccdscan.io/?dcount=1&dentity=transaction&dhash=${"1".repeat(64)}`,
+        payload: { sessionId, receiptSha256 },
+        anchoredAt: new Date().toISOString(),
+      }),
+    },
+    execute: async () => ({
+      status: "reproduced",
+      receipt: { receiptHash: "e".repeat(64), input: { sourceSha256: DEMO_PROGRAM.workerInputSha256 } },
+    }),
+  });
+  await new Promise(resolve => configured.listen(0, "127.0.0.1", resolve));
+  const base2 = `http://127.0.0.1:${configured.address().port}`;
+  try {
+    const sub = await (await fetch(`${base2}/v1/programs/demo-vault/submissions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${researcherToken}`, "content-type": "application/json", "idempotency-key": "anchor-sub-2" },
+      body: JSON.stringify({ claim: "donation-share-inflation", targetSha256: DEMO_PROGRAM.targetSha256 }),
+    })).json();
+    const job = await (await fetch(`${base2}/v1/programs/demo-vault/submissions/${sub.id}/jobs`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${researcherToken}`, "content-type": "application/json", "idempotency-key": "anchor-job-2" },
+      body: JSON.stringify({ artifactFormat: "repo-fixture-v1", fixture: "vulnerable" }),
+    })).json();
+    await new Promise(resolve => setTimeout(resolve, 40));
+
+    const anchored = await fetch(`${base2}/v1/programs/demo-vault/jobs/${job.id}/anchor`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${teamToken}`, "content-type": "application/json", "idempotency-key": "anchor-try-3" },
+      body: JSON.stringify({}),
+    });
+    assert.equal(anchored.status, 201);
+    assert.equal((await anchored.json()).anchor.txHash, "1".repeat(64));
+
+    // Re-anchoring same finished job fails with 409.
+    const dup = await fetch(`${base2}/v1/programs/demo-vault/jobs/${job.id}/anchor`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${teamToken}`, "content-type": "application/json", "idempotency-key": "anchor-try-4" },
+      body: JSON.stringify({}),
+    });
+    assert.equal(dup.status, 409);
+
+    const readAnchor = await fetch(`${base2}/v1/programs/demo-vault/jobs/${job.id}/anchor`, {
+      headers: { authorization: `Bearer ${teamToken}` },
+    });
+    assert.equal(readAnchor.status, 200);
+    assert.equal((await readAnchor.json()).txHash, "1".repeat(64));
+  } finally {
+    await new Promise(resolve => configured.close(() => resolve()));
+  }
+});

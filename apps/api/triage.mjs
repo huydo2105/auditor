@@ -134,6 +134,7 @@ export function buildInboxPayload({ submissions, jobs, actor }) {
         isPatchRetest: Boolean(j.isPatchRetest),
         verdict: j.result?.status ?? null,
         receiptHash: j.result?.receipt?.receiptHash ?? null,
+        anchor: j.anchor ?? null,
         result: j.result,
       };
     };
