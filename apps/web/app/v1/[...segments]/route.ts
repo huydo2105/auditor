@@ -29,7 +29,8 @@ async function forward(request: Request, context: Context, method: "GET" | "POST
       || (method === "GET" && segments.length === 3 && segments[2] === "submissions")
       || (method === "POST" && segments.length === 3 && segments[2] === "submissions")
       || (method === "GET" && segments.length === 4 && segments[2] === "jobs" && jobId.test(segments[3]))
-      || (method === "GET" && segments.length === 5 && segments[2] === "jobs" && jobId.test(segments[3]) && segments[4] === "evidence")
+      || (method === "GET" && segments.length === 5 && segments[2] === "jobs" && jobId.test(segments[3]) && ["evidence", "anchor"].includes(segments[4]))
+      || (method === "POST" && segments.length === 5 && segments[2] === "jobs" && jobId.test(segments[3]) && segments[4] === "anchor")
       || (method === "POST" && segments.length === 5 && segments[2] === "submissions" && jobId.test(segments[3]) && ["jobs", "agent-note", "triage", "patch-retest"].includes(segments[4]))
     ) ? `/v1/${segments.join("/")}` : null;
   if (!path) return error(404, "not found");

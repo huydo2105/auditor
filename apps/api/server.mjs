@@ -10,6 +10,8 @@ import { createWalletAuthStore, formatClearSessionCookie, formatSessionCookie } 
 import { createProgramStore } from "./program-store.mjs";
 import { generateAgentSetup, validateAgentSetupInput } from "./agent-setup.mjs";
 import { buildInboxPayload, validateAdvisoryNote, validateTriageDecision } from "./triage.mjs";
+import { createConcordiumAnchorService } from "../../packages/core/concordium-anchor.mjs";
+import { receiptHash } from "../../packages/core/receipt.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = value => createHash("sha256").update(value).digest("hex");
@@ -100,7 +102,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
   allowedOrigins = [], teamAccounts = [], invitedResearcherAccounts = [], lookupAccountInfo,
   secureCookies = process.env.NODE_ENV === "production",
   execute = executeJob, now = Date.now, maxJobs = 16, programStorePath = null,
-  generateSetup = generateAgentSetup } = {}) {
+  generateSetup = generateAgentSetup, anchorService = createConcordiumAnchorService() } = {}) {
   if (typeof token !== "string" || token.length < 32) throw new Error("AUDITOR_API_TOKEN must be at least 32 characters");
   const configured = [teamToken, researcherToken].filter(value => value !== undefined);
   if (configured.some(value => typeof value !== "string" || value.length < 32)
@@ -351,7 +353,14 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
           if (!job || job.programId !== DEMO_PROGRAM.id || (actor.role !== "team" && job.authorId !== actor.id))
             return json(res, 404, { error: "job not found" });
           return json(res, 200, { id: job.id, programId: job.programId, submissionId: job.submissionId,
-            actorId: job.authorId, kind: job.kind, state: job.state, fixture: job.body.fixture, result: job.result });
+            actorId: job.authorId, kind: job.kind, state: job.state, fixture: job.body.fixture,
+            result: job.result, anchor: job.anchor ?? null });
+        }
+        if (req.method === "GET" && segments.length === 4 && segments[1] === "jobs" && segments[3] === "anchor") {
+          const job = jobs.get(segments[2]);
+          if (!job || job.programId !== DEMO_PROGRAM.id || (actor.role !== "team" && job.authorId !== actor.id))
+            return json(res, 404, { error: "job not found" });
+          return json(res, 200, job.anchor ?? { anchored: false, jobId: job.id });
         }
         if (req.method === "GET" && segments.length === 4 && segments[1] === "jobs" && segments[3] === "evidence") {
           const job = jobs.get(segments[2]);
@@ -373,6 +382,26 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
           });
         }
         if (req.method !== "POST") return json(res, 404, { error: "not found" });
+        const isJobAnchor = segments.length === 4 && segments[1] === "jobs" && segments[3] === "anchor";
+        if (isJobAnchor) {
+          if (actor.role !== "team" || actor.badge) return json(res, 403, { error: "human team role required" });
+          const job = jobs.get(segments[2]);
+          if (!job || job.programId !== DEMO_PROGRAM.id) return json(res, 404, { error: "job not found" });
+          if (job.state !== "finished" || !job.result?.receipt) return json(res, 409, { error: "finished verification receipt required before anchoring" });
+          if (job.anchor?.anchored) return json(res, 409, { error: "job receipt already anchored" });
+          const reqKey = req.headers["idempotency-key"];
+          if (typeof reqKey !== "string" || !/^[a-zA-Z0-9_-]{8,64}$/.test(reqKey)) throw fail(400, "valid Idempotency-Key required");
+          const digest = job.result.receipt.receiptHash ?? receiptHash(job.result.receipt);
+          const anchorRes = await anchorService.anchorReceipt({
+            programId: DEMO_PROGRAM.id,
+            sessionId: `job-${job.id}`,
+            receiptSha256: digest,
+            agentBadge: job.authorId?.startsWith("agent:") ? job.authorId.slice(6) : undefined,
+          });
+          if (!anchorRes.anchored) return json(res, 503, anchorRes);
+          job.anchor = anchorRes;
+          return json(res, 201, { anchor: anchorRes, jobId: job.id });
+        }
         const isAdvisoryNote = segments.length === 4 && segments[1] === "submissions" && segments[3] === "agent-note";
         const isTriage = segments.length === 4 && segments[1] === "submissions" && segments[3] === "triage";
         const isPatchRetest = segments.length === 4 && segments[1] === "submissions" && segments[3] === "patch-retest";

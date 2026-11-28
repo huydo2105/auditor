@@ -100,6 +100,9 @@ const FILTERS: { id: FilterCategory; label: string }[] = [
   { id: "badge", label: "Badges" },
 ];
 
+const nextKey = (prefix: string) =>
+  `${prefix}-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 12)}`;
+
 export function TeamInbox() {
   const [token, setToken] = useState("");
   const [tokenDraft, setTokenDraft] = useState("");
@@ -259,8 +262,32 @@ export function TeamInbox() {
 
   async function triggerPatchRetest() {
     if (!activeSubmission) return;
-    const idempotencyKey = `retest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    await postTeamAction(activeSubmission.id, "patch-retest", {}, { "idempotency-key": idempotencyKey });
+    await postTeamAction(activeSubmission.id, "patch-retest", {}, { "idempotency-key": nextKey("retest") });
+  }
+
+  async function anchorJob(jobId: string) {
+    setBusyAction(`anchor-${jobId}`);
+    setActionMessage("");
+    setError("");
+    try {
+      const res = await fetch(`/v1/programs/demo-vault/jobs/${jobId}/anchor`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { ...authHeaders(), "content-type": "application/json", "idempotency-key": nextKey("anchor") },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.reason || json.error || "Unable to anchor receipt on Concordium Testnet.");
+        return;
+      }
+      setActionMessage(`Anchored on Concordium Testnet (${json.anchor?.txHash?.slice(0, 12)}…).`);
+      await loadInbox();
+    } catch {
+      setError("Verification API is unavailable.");
+    } finally {
+      setBusyAction("");
+    }
   }
 
   return (
@@ -412,10 +439,29 @@ export function TeamInbox() {
                       {activeSubmission.jobs.length === 0 ? (
                         <p>No exploit verification job run yet.</p>
                       ) : activeSubmission.jobs.map(job => (
-                        <p key={job.id} className="mono-data">
-                          Job {job.id.slice(0, 8)}… ({job.fixture}) → {job.verdict ?? job.state}
-                          {job.receiptHash ? ` · receipt ${job.receiptHash.slice(0, 16)}…` : ""}
-                        </p>
+                        <div key={job.id} className="mt-1">
+                          <p className="mono-data">
+                            Job {job.id.slice(0, 8)}… ({job.fixture}) → {job.verdict ?? job.state}
+                            {job.receiptHash ? ` · receipt ${job.receiptHash.slice(0, 16)}…` : ""}
+                          </p>
+                          {job.anchor?.txHash ? (
+                            <p className="mono-data">
+                              Concordium Testnet Anchor:{" "}
+                              <a href={job.anchor.explorerUrl} target="_blank" rel="noopener noreferrer">
+                                {job.anchor.txHash.slice(0, 16)}…
+                              </a>
+                            </p>
+                          ) : data.actor.role === "team" && job.state === "finished" && job.result?.receipt ? (
+                            <button
+                              type="button"
+                              className="report-secondary focus-ring mt-2"
+                              disabled={Boolean(busyAction)}
+                              onClick={() => void anchorJob(job.id)}
+                            >
+                              Anchor on Concordium Testnet
+                            </button>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   </li>
