@@ -702,7 +702,7 @@ test("private team inbox displays findings timeline, supports advisory notes, hu
     await expect(page.getByText("Foundry reproduced exploit cleanly.").first()).toBeVisible();
 
     await page.getByRole("button", { name: "Accept", exact: true }).click();
-    await expect(page.getByText("Decision: accept")).toBeVisible();
+    await expect(page.getByText("Decision: accept", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Run PatchedVault retest" }).click();
     await expect(page.getByText(/Patch retest \(patched\) → not_reproduced/).first()).toBeVisible({ timeout: 10_000 });
