@@ -20,13 +20,17 @@ export const MCP_TOOLS = [
   },
   {
     name: "submit_finding",
-    description: "Submit a structured vulnerability finding claim bound to the program's pinned target SHA-256.",
+    description: "Submit a structured vulnerability finding bound to the program's pinned target digest or git commit, including a Foundry .t.sol PoC for dynamic programs.",
     inputSchema: {
       type: "object",
       properties: {
         programId: { type: "string" },
-        claim: { type: "string", description: "Reviewed claim identifier (e.g. 'donation-share-inflation')." },
-        targetSha256: { type: "string", description: "Pinned SHA-256 digest of the target contract." },
+        claim: { type: "string", description: "Reviewed claim identifier for demo-vault (e.g. 'donation-share-inflation')." },
+        targetSha256: { type: "string", description: "Pinned SHA-256 digest of the target contract (for demo-vault)." },
+        targetRevision: { type: "string", description: "Pinned 40-char git commit SHA for dynamic team-created programs." },
+        pocFileName: { type: "string", description: "PoC filename ending in .t.sol (e.g. 'ReentrancyVaultTest.t.sol')." },
+        pocSource: { type: "string", description: "Foundry .t.sol PoC test source (<= 32 KiB, offline only)." },
+        testContract: { type: "string", description: "Optional Foundry contract name declared inside pocSource." },
         idempotencyKey: { type: "string", description: "8-64 character idempotency key for safe retries." },
         report: {
           type: "object",
@@ -43,22 +47,23 @@ export const MCP_TOOLS = [
           additionalProperties: false,
         },
       },
-      required: ["programId", "claim", "targetSha256"],
+      required: ["programId"],
       additionalProperties: false,
     },
   },
   {
     name: "verify_poc",
-    description: "Start an isolated Foundry verification job for a reviewed fixture ('vulnerable' or 'patched') on a submitted finding.",
+    description: "Start an isolated Foundry verification job on a submitted finding (either a reviewed fixture on demo-vault or testContract for a dynamic program PoC).",
     inputSchema: {
       type: "object",
       properties: {
         programId: { type: "string" },
         submissionId: { type: "string", description: "UUID returned by submit_finding." },
-        fixture: { type: "string", enum: ["vulnerable", "patched"] },
+        fixture: { type: "string", enum: ["vulnerable", "patched"], description: "Fixture target for demo-vault." },
+        testContract: { type: "string", description: "Foundry test contract name to run for dynamic programs." },
         idempotencyKey: { type: "string", description: "8-64 character idempotency key for safe retries." },
       },
-      required: ["programId", "submissionId", "fixture"],
+      required: ["programId", "submissionId"],
       additionalProperties: false,
     },
   },

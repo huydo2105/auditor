@@ -6,6 +6,8 @@ const PROGRAM_ID_RE = /^(?:demo-vault|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-
 const UUID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const IDEMPOTENCY_RE = /^[a-zA-Z0-9_-]{8,64}$/;
 const MAX_BODY_BYTES = 4096;
+const MAX_SUBMISSION_BODY_BYTES = 49_152;
+const DYNAMIC_SUBMISSION_PATH_RE = /^\/v1\/programs\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\/submissions$/;
 
 function assertProgramId(programId) {
   if (typeof programId !== "string" || !PROGRAM_ID_RE.test(programId)) {
@@ -44,8 +46,9 @@ export function createAgentGatewayClient({
 
   async function signedRequest(method, path, { payload, idempotencyKey } = {}) {
     const rawBody = method === "POST" ? Buffer.from(JSON.stringify(payload ?? {}), "utf8") : Buffer.alloc(0);
-    if (rawBody.byteLength > MAX_BODY_BYTES) {
-      throw new Error("request body exceeds 4096-byte API limit");
+    const maxBytes = DYNAMIC_SUBMISSION_PATH_RE.test(path) ? MAX_SUBMISSION_BODY_BYTES : MAX_BODY_BYTES;
+    if (rawBody.byteLength > maxBytes) {
+      throw new Error(`request body exceeds ${maxBytes}-byte API limit`);
     }
     const nonce = randomUUID();
     const expires = now() + 60_000;
@@ -82,15 +85,35 @@ export function createAgentGatewayClient({
       assertProgramId(programId);
       return signedRequest("GET", `/v1/programs/${programId}`);
     },
-    submitFinding: async ({ programId = "demo-vault", claim, targetSha256, report, idempotencyKey }) => {
+    submitFinding: async ({
+      programId = "demo-vault",
+      claim,
+      targetSha256,
+      targetRevision,
+      report,
+      pocFileName,
+      pocSource,
+      testContract,
+      idempotencyKey,
+    }) => {
       assertProgramId(programId);
-      const payload = { claim, targetSha256, ...(report !== undefined ? { report } : {}) };
+      const payload = programId === "demo-vault"
+        ? { claim, targetSha256, ...(report !== undefined ? { report } : {}) }
+        : {
+            targetRevision,
+            report,
+            pocFileName,
+            pocSource,
+            ...(testContract !== undefined ? { testContract } : {}),
+          };
       return signedRequest("POST", `/v1/programs/${programId}/submissions`, { payload, idempotencyKey });
     },
-    verifyPoc: async ({ programId = "demo-vault", submissionId, fixture, idempotencyKey }) => {
+    verifyPoc: async ({ programId = "demo-vault", submissionId, fixture, testContract, idempotencyKey }) => {
       assertProgramId(programId);
       assertUuid(submissionId, "submissionId");
-      const payload = { artifactFormat: "repo-fixture-v1", fixture };
+      const payload = programId === "demo-vault"
+        ? { artifactFormat: "repo-fixture-v1", fixture }
+        : { artifactFormat: "arbitrary-poc-v1", testContract };
       return signedRequest("POST", `/v1/programs/${programId}/submissions/${submissionId}/jobs`, { payload, idempotencyKey });
     },
     getJobStatus: async ({ programId = "demo-vault", jobId }) => {
