@@ -9,6 +9,7 @@ import { authorizeAgentRequest, lookupConcordiumAgent, pruneExpiredNonces } from
 import { createWalletAuthStore, formatClearSessionCookie, formatSessionCookie } from "./wallet-auth.mjs";
 import { createProgramStore } from "./program-store.mjs";
 import { generateAgentSetup, validateAgentSetupInput } from "./agent-setup.mjs";
+import { buildInboxPayload, validateAdvisoryNote, validateTriageDecision } from "./triage.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = value => createHash("sha256").update(value).digest("hex");
@@ -291,7 +292,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
         return json(res, 404, { error: "not found" });
       } catch (error) { return json(res, error.status ?? 500, { error: error.status ? error.message : "internal error" }); }
     }
-    const isProgram = path.startsWith("/v1/programs/");
+    const isProgram = path.startsWith("/v1/programs/") || path === "/v1/inbox";
     let actor = equalToken(req.headers.authorization, teamToken) && teamToken ? { id: DEMO_PROGRAM.ownerId, role: "team" }
       : equalToken(req.headers.authorization, researcherToken) && researcherToken ? { id: DEMO_PROGRAM.invitedResearcherIds[0], role: "researcher" } : null;
     if (isProgram && !req.headers.authorization && invitedAgentBadges.length && req.headers["x-auditor-agent-badge"]) {
@@ -307,7 +308,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
       } catch { actor = null; }
     }
     if (isProgram && !actor && !req.headers.authorization && !req.headers["x-auditor-agent-badge"] && req.headers.cookie) {
-      const requestedProgramId = path.split("/")[3] ?? "";
+      const requestedProgramId = path === "/v1/inbox" ? DEMO_PROGRAM.id : (path.split("/")[3] ?? "");
       try {
         actor = walletAuth.programActorFromCookie({
           cookieHeader: req.headers.cookie, method: req.method, origin: req.headers.origin,
@@ -330,6 +331,10 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
     buckets.set(key, next);
     if (next.count > limit) return json(res, 429, { error: "rate limit exceeded" });
     try {
+      if (path === "/v1/inbox") {
+        if (req.method !== "GET") return json(res, 404, { error: "not found" });
+        return json(res, 200, buildInboxPayload({ submissions, jobs, actor }));
+      }
       if (isProgram) {
         const segments = path.split("/").slice(3);
         if (segments[0] !== DEMO_PROGRAM.id) return json(res, 404, { error: "program not found" });
@@ -368,6 +373,54 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
           });
         }
         if (req.method !== "POST") return json(res, 404, { error: "not found" });
+        const isAdvisoryNote = segments.length === 4 && segments[1] === "submissions" && segments[3] === "agent-note";
+        const isTriage = segments.length === 4 && segments[1] === "submissions" && segments[3] === "triage";
+        const isPatchRetest = segments.length === 4 && segments[1] === "submissions" && segments[3] === "patch-retest";
+        if (isAdvisoryNote || isTriage || isPatchRetest) {
+          if (actor.role !== "team") return json(res, 403, { error: "team role required" });
+          const targetSub = submissions.get(segments[2]);
+          if (!targetSub || targetSub.programId !== DEMO_PROGRAM.id) return json(res, 404, { error: "submission not found" });
+          if (isAdvisoryNote) {
+            const note = {
+              id: randomUUID(),
+              authorId: actor.id,
+              createdAt: new Date(now()).toISOString(),
+              ...validateAdvisoryNote(await readBody(req)),
+            };
+            targetSub.advisoryNotes.push(note);
+            return json(res, 201, { note, submission: targetSub });
+          }
+          if (isTriage) {
+            if (actor.badge) return json(res, 403, { error: "human team approval required; agents cannot finalize triage" });
+            const decision = validateTriageDecision(await readBody(req));
+            targetSub.triage = { ...decision, decidedBy: actor.id, decidedAt: new Date(now()).toISOString() };
+            return json(res, 200, { triage: targetSub.triage, submission: targetSub });
+          }
+          if (!fixtureRevisionMatches()) return json(res, 409, { error: "reviewed fixture revision changed" });
+          const retestKey = req.headers["idempotency-key"];
+          if (typeof retestKey !== "string" || !/^[a-zA-Z0-9_-]{8,64}$/.test(retestKey)) throw fail(400, "valid Idempotency-Key required");
+          const retestBody = { artifactFormat: "repo-fixture-v1", fixture: "patched" };
+          const scopedRetestKey = `${DEMO_PROGRAM.id}:${actor.id}:patch-retest:${targetSub.id}:${retestKey}`;
+          const retestFingerprint = sha(JSON.stringify([DEMO_PROGRAM.id, actor.id, "patch-retest", targetSub.id, retestBody]));
+          const priorRetest = idempotency.get(scopedRetestKey);
+          if (priorRetest) return priorRetest.fingerprint === retestFingerprint
+            ? json(res, 202, { id: priorRetest.id, state: jobs.get(priorRetest.id).state, fixture: "patched", isPatchRetest: true })
+            : json(res, 409, { error: "idempotency key reused for a different request" });
+          if (programRuns >= DEMO_PROGRAM.runLimit) throw fail(429, "program run limit reached");
+          if (jobs.size >= maxJobs) throw fail(503, "job capacity reached; restart local server after reviewing results");
+          const retestJob = {
+            id: randomUUID(), programId: DEMO_PROGRAM.id, authorId: actor.id, submissionId: targetSub.id,
+            kind: "verify", body: retestBody, state: "queued", result: null, isPatchRetest: true,
+            createdAt: new Date(now()).toISOString(),
+          };
+          jobs.set(retestJob.id, retestJob);
+          targetSub.patchRetestJobIds.push(retestJob.id);
+          programRuns++;
+          idempotency.set(scopedRetestKey, { fingerprint: retestFingerprint, id: retestJob.id });
+          queue.push(retestJob);
+          pump();
+          return json(res, 202, { id: retestJob.id, state: retestJob.state, fixture: "patched", isPatchRetest: true });
+        }
         if (actor.role !== "researcher") return json(res, 403, { error: "researcher role required" });
         if (!fixtureRevisionMatches()) return json(res, 409, { error: "reviewed fixture revision changed" });
         const requestKey = req.headers["idempotency-key"];
@@ -400,7 +453,8 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
             ...(body.report.tools?.trim() ? { tools: body.report.tools.trim() } : {}),
           } : undefined;
           const item = { id: randomUUID(), programId: DEMO_PROGRAM.id, authorId: actor.id,
-            claim: body.claim, targetSha256: body.targetSha256, ...(report ? { report } : {}), jobIds: [] };
+            claim: body.claim, targetSha256: body.targetSha256, ...(report ? { report } : {}),
+            createdAt: new Date(now()).toISOString(), advisoryNotes: [], triage: null, jobIds: [], patchRetestJobIds: [] };
           submissions.set(item.id, item);
           idempotency.set(scopedKey, { fingerprint, id: item.id });
           return json(res, 201, item);
@@ -408,7 +462,8 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
         if (programRuns >= DEMO_PROGRAM.runLimit) throw fail(429, "program run limit reached");
         if (jobs.size >= maxJobs) throw fail(503, "job capacity reached; restart local server after reviewing results");
         const job = { id: randomUUID(), programId: DEMO_PROGRAM.id, authorId: actor.id,
-          submissionId: submission.id, kind: "verify", body, state: "queued", result: null };
+          submissionId: submission.id, kind: "verify", body, state: "queued", result: null,
+          isPatchRetest: false, createdAt: new Date(now()).toISOString() };
         jobs.set(job.id, job);
         submission.jobIds.push(job.id);
         programRuns++;

@@ -248,7 +248,7 @@ export function AccountMenu() {
       ) : (
         <div className="account-authed">
           <Link
-            href="/programs/demo-vault"
+            href="/inbox"
             className="header-icon-btn focus-ring"
             aria-label="Program inbox"
             title="Program inbox"
