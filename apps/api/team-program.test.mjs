@@ -94,7 +94,7 @@ test("team-owned program persists and grants only invited private reads", async 
     assert.equal((await call(app.base, `/v1/programs/${randomUUID()}`, r)).status, 404);
     assert.equal((await call(app.base, `/v1/programs/${id}`, r)).status, 200);
     assert.equal((await call(app.base, `/v1/programs/${id}`, x)).status, 404);
-    assert.equal((await call(app.base, `/v1/programs/${id}/jobs/${randomUUID()}`, r)).status, 403);
+    assert.equal((await call(app.base, `/v1/programs/${id}/jobs/${randomUUID()}`, r)).status, 404);
     assert.equal((await call(app.base, `/v1/programs/${id}/invitations`, o,
       { action: "invite", kind: "researcher-account", value: outsider.account })).status, 200);
     assert.deepEqual((await call(app.base, `/v1/programs/${id}`, r)).data.program.invitedResearcherAccounts,

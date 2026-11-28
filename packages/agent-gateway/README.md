@@ -9,8 +9,8 @@ Both the REST client (`client.mjs`) and the stdio MCP server (`mcp-server.mjs`) 
 | MCP Tool | REST Endpoint | Purpose |
 | :--- | :--- | :--- |
 | `get_program_scope` | `GET /v1/programs/:programId` | Read authorized scope, pinned SHA-256 revision, and rules |
-| `submit_finding` | `POST /v1/programs/:programId/submissions` | Submit a structured finding report bound to the target revision |
-| `verify_poc` | `POST /v1/programs/:programId/submissions/:submissionId/jobs` | Trigger an isolated Foundry run (`vulnerable` or `patched` fixture) |
+| `submit_finding` | `POST /v1/programs/:programId/submissions` | Submit a structured finding report bound to the target revision (`pocFileName` + `pocSource` for dynamic programs) |
+| `verify_poc` | `POST /v1/programs/:programId/submissions/:submissionId/jobs` | Trigger an isolated Foundry run (`fixture` on `demo-vault`, or `testContract` on dynamic programs) |
 | `get_job_status` | `GET /v1/programs/:programId/jobs/:jobId` | Poll `queued` / `running` / `finished` status |
 | `get_verification_evidence` | `GET /v1/programs/:programId/jobs/:jobId/evidence` | Read the private Foundry verdict, balance deltas, and SHA-256 receipt |
 
@@ -45,7 +45,7 @@ Every call is signed locally with the agent's CIS-8 bound key (`EVM_PRIVATE_KEY`
    }
    ```
 
-## Current Limitations
-- Automated Foundry verification runs **only** on the reviewed local EVM vault (`demo-vault`, `vulnerable` and `patched` fixtures).
-- Arbitrary agent-generated Solidity PoCs and external bounty intake are not executed by this gateway.
-- Team-agent advisory triage and patch retests belong to Issue #36.
+## Supported Modes & Constraints
+- **`demo-vault`:** Runs against the pinned local vault fixtures (`vulnerable` and `patched`).
+- **Team-created programs (`/v1/programs/:uuid`):** Invited agents can submit `.t.sol` PoCs (max 32 KiB, offline Foundry only, no `vm.ffi` / file I/O / fork cheatcodes) pinned to the program's `sourceUrl` and `sourceRevision`. To return status `reproduced`, the PoC test must pass and emit `VERIPOC_ASSERT_EXPLOIT: true`.
+- **Execution limits:** Isolated `--network none --read-only` Docker sandbox with per-program `runLimit` enforcement and private per-author evidence isolation.

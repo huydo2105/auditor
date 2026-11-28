@@ -19,8 +19,16 @@ async function forward(request: Request, context: Context, method: "GET" | "POST
       || (method === "POST" && segments.length === 2 && segments[1] === "agent-setup")
       || (method === "GET" && segments.length === 2 && ["mine", "invited", "public"].includes(segments[1]))
       || (segments.length >= 2 && jobId.test(segments[1]) && (
-        (method === "GET" && (segments.length === 2 || (segments.length === 3 && ["submissions", "jobs"].includes(segments[2]))))
-        || (method === "POST" && segments.length === 3 && ["invitations", "status"].includes(segments[2]))
+        (method === "GET" && (
+          segments.length === 2
+          || (segments.length === 3 && ["submissions", "jobs"].includes(segments[2]))
+          || (segments.length === 4 && segments[2] === "jobs" && jobId.test(segments[3]))
+          || (segments.length === 5 && segments[2] === "jobs" && jobId.test(segments[3]) && segments[4] === "evidence")
+        ))
+        || (method === "POST" && (
+          (segments.length === 3 && ["invitations", "status", "submissions"].includes(segments[2]))
+          || (segments.length === 5 && segments[2] === "submissions" && jobId.test(segments[3]) && segments[4] === "jobs")
+        ))
       ))
     ) ? `/v1/${segments.join("/")}`
     : method === "GET" && segments.length === 1 && segments[0] === "inbox" ? "/v1/inbox"
@@ -59,7 +67,11 @@ async function forward(request: Request, context: Context, method: "GET" | "POST
         const { done, value } = await reader.read();
         if (done) break;
         size += value.byteLength;
-        if (size > (path === "/v1/programs" ? 16_384 : path === "/v1/programs/agent-setup" ? 12_000 : 4096)) { await reader.cancel(); return error(413, "request too large"); }
+        const maxBytes = path === "/v1/programs" ? 16_384
+  : path === "/v1/programs/agent-setup" ? 12_000
+  : /^\/v1\/programs\/[a-f0-9-]{36}\/submissions$/.test(path) ? 49_152
+  : 4096;
+if (size > maxBytes) { await reader.cancel(); return error(413, "request too large"); }
         chunks.push(value);
       }
       const buffer = new Uint8Array(size);

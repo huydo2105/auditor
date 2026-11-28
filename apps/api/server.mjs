@@ -13,6 +13,7 @@ import { buildInboxPayload, validateAdvisoryNote, validateTriageDecision } from 
 import { createConcordiumAnchorService } from "../../packages/core/concordium-anchor.mjs";
 import { receiptHash } from "../../packages/core/receipt.mjs";
 import { buildPaymentTerms, DEFAULT_X402_CAP, verifyConcordiumTestnetTx, verifyX402Payment } from "./x402.mjs";
+import { runArbitrarySubmission, validateArbitraryInput } from "../../workers/sandbox/arbitrary-runner.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sha = value => createHash("sha256").update(value).digest("hex");
@@ -102,7 +103,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
   invitedAgentBadges = [], agentDomain, lookupAgent = lookupConcordiumAgent,
   allowedOrigins = [], teamAccounts = [], invitedResearcherAccounts = [], lookupAccountInfo,
   secureCookies = process.env.NODE_ENV === "production",
-  execute = executeJob, now = Date.now, maxJobs = 16, programStorePath = null,
+  execute = executeJob, executeArbitrary = runArbitrarySubmission, now = Date.now, maxJobs = 16, programStorePath = null,
   generateSetup = generateAgentSetup, anchorService = createConcordiumAnchorService(),
   x402Cap = Number(process.env.VERIPOC_X402_CAP ?? DEFAULT_X402_CAP),
   verifyPaymentOnChain = verifyConcordiumTestnetTx } = {}) {
@@ -120,6 +121,7 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
   const idempotency = new Map();
   const submissions = new Map();
   let programRuns = 0;
+  const dynamicProgramRuns = new Map();
   const buckets = new Map();
   const usedAgentNonces = new Map();
   const usedTxHashes = new Set();
@@ -131,10 +133,25 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
     const job = queue.shift();
     job.state = "running";
     Promise.resolve().then(() => {
+      if (job.kind === "arbitrary-verify") {
+        return executeArbitrary({
+          programId: job.programId,
+          submissionId: job.submissionId,
+          sourceUrl: job.body.sourceUrl,
+          sourceRevision: job.body.sourceRevision,
+          pocFileName: job.body.pocFileName,
+          pocSource: job.body.pocSource,
+          testContract: job.body.testContract,
+        });
+      }
       if (job.programId && !fixtureRevisionMatches()) throw new Error("reviewed fixture revision changed before execution");
       return execute(job.kind, job.body);
     }).then(result => {
-      if (job.programId && ["reproduced", "not_reproduced"].includes(result.status)
+      if (job.kind === "arbitrary-verify") {
+        if (result?.receipt?.repoCommitSha && result.receipt.repoCommitSha !== job.body.sourceRevision) {
+          throw new Error("worker receipt commit does not match pinned program revision");
+        }
+      } else if (job.programId && ["reproduced", "not_reproduced"].includes(result.status)
         && result.receipt?.input?.sourceSha256 !== DEMO_PROGRAM.workerInputSha256)
         throw new Error("worker image does not match reviewed program inputs");
       job.state = "finished";
@@ -260,28 +277,203 @@ export function createApiServer({ token, teamToken, researcherToken, invitedRese
         if (!item) return json(res, 404, { error: "program not found" });
         const isOwner = account === item.ownerAccount;
         const isInvited = item.status === "active" && account && item.invitedResearcherAccounts.includes(account);
-        let isInvitedAgent = false;
-        if (item.status === "active" && !account && req.method === "GET" && agentDomain
+        let agentActor = null;
+        if (item.status === "active" && !account && (req.method === "GET" || req.method === "POST") && agentDomain
           && item.invitedAgentBadges.includes(req.headers["x-auditor-agent-badge"])) {
-          pruneExpiredNonces(usedAgentNonces, now());
-          const actor = await authorizeAgentRequest({ headers: req.headers, method: req.method, path,
-            body: Buffer.alloc(0), domain: agentDomain, invitedBadges: item.invitedAgentBadges,
-            lookup: lookupAgent, now, usedNonces: usedAgentNonces });
-          isInvitedAgent = Boolean(actor);
+          const signedBody = req.method === "POST" ? await readRawBody(req, 49_152) : Buffer.alloc(0);
+          try {
+            pruneExpiredNonces(usedAgentNonces, now());
+            agentActor = await authorizeAgentRequest({ headers: req.headers, method: req.method, path,
+              body: signedBody, domain: agentDomain, invitedBadges: item.invitedAgentBadges,
+              lookup: lookupAgent, now, usedNonces: usedAgentNonces });
+          } catch {
+            agentActor = null;
+          }
         }
+        const isInvitedAgent = Boolean(agentActor);
         if (req.method === "GET" && programParts.length === 1 && item.visibility === "public"
           && item.status === "active" && !isOwner && !isInvited && !isInvitedAgent) {
           return json(res, 200, { program: publicProgramView(item), actor: { role: "visitor" } });
         }
         if (!isOwner && !isInvited && !isInvitedAgent) return json(res, 404, { error: "program not found" });
+        const dynActor = isOwner
+          ? { id: item.ownerAccount, role: "team" }
+          : isInvited
+            ? { id: account, role: "researcher" }
+            : { id: agentActor.id, role: "researcher", badge: agentActor.badge };
         if (req.method === "GET" && programParts.length === 1)
           return json(res, 200, { program: isOwner ? item : programForMember(item, account,
             isInvitedAgent ? req.headers["x-auditor-agent-badge"] : null),
-          actor: { role: isOwner ? "team" : "researcher" } });
-        if (req.method === "GET" && programParts.length === 2 && programParts[1] === "submissions")
-          return json(res, 200, { submissions: [] });
-        if (req.method === "GET" && programParts.length === 2 && programParts[1] === "jobs")
-          return json(res, 200, { jobs: [] });
+          actor: { role: dynActor.role } });
+        if (req.method === "GET" && programParts.length === 2 && programParts[1] === "submissions") {
+          const visible = [...submissions.values()].filter(s => s.programId === item.id && (isOwner || s.authorId === dynActor.id));
+          return json(res, 200, { submissions: visible });
+        }
+        if (req.method === "GET" && programParts.length === 2 && programParts[1] === "jobs") {
+          const visible = [...jobs.values()]
+            .filter(j => j.programId === item.id && (isOwner || j.authorId === dynActor.id))
+            .map(j => ({
+              id: j.id,
+              submissionId: j.submissionId,
+              state: j.state,
+              kind: j.kind,
+              testContract: j.body.testContract,
+              pocFileName: j.body.pocFileName,
+              status: j.result?.status ?? null,
+              receiptHash: j.result?.receipt?.receiptHash ?? null,
+              createdAt: j.createdAt,
+            }));
+          return json(res, 200, { jobs: visible });
+        }
+        if (req.method === "GET" && programParts.length === 3 && programParts[1] === "jobs" && dynamicId.test(programParts[2])) {
+          const job = jobs.get(programParts[2]);
+          if (!job || job.programId !== item.id || (!isOwner && job.authorId !== dynActor.id)) {
+            return json(res, 404, { error: "job not found" });
+          }
+          return json(res, 200, {
+            id: job.id,
+            programId: item.id,
+            submissionId: job.submissionId,
+            kind: job.kind,
+            state: job.state,
+            testContract: job.body.testContract,
+            pocFileName: job.body.pocFileName,
+            result: job.result ? {
+              status: job.result.status,
+              reason: job.result.reason ?? null,
+              exitCode: job.result.exitCode ?? null,
+              receiptHash: job.result.receipt?.receiptHash ?? null,
+            } : null,
+          });
+        }
+        if (req.method === "GET" && programParts.length === 4 && programParts[1] === "jobs"
+          && dynamicId.test(programParts[2]) && programParts[3] === "evidence") {
+          const job = jobs.get(programParts[2]);
+          if (!job || job.programId !== item.id || (!isOwner && job.authorId !== dynActor.id)) {
+            return json(res, 404, { error: "job not found" });
+          }
+          if (job.state !== "finished") {
+            return json(res, 409, { error: "job has not finished yet", state: job.state });
+          }
+          return json(res, 200, {
+            jobId: job.id,
+            programId: item.id,
+            submissionId: job.submissionId,
+            state: job.state,
+            status: job.result?.status ?? "tool_error",
+            reason: job.result?.reason ?? null,
+            exitCode: job.result?.exitCode ?? null,
+            output: job.result?.output ?? "",
+            errorOutput: job.result?.errorOutput ?? "",
+            receipt: job.result?.receipt ?? null,
+          });
+        }
+        if (req.method === "POST" && (
+          (programParts.length === 2 && programParts[1] === "submissions")
+          || (programParts.length === 4 && programParts[1] === "submissions" && dynamicId.test(programParts[2]) && programParts[3] === "jobs")
+        )) {
+          if (dynActor.role !== "researcher") return json(res, 403, { error: "researcher role required" });
+          if (item.status !== "active") throw fail(409, "program is not active");
+          const requestKey = req.headers["idempotency-key"];
+          if (typeof requestKey !== "string" || !/^[a-zA-Z0-9_-]{8,64}$/.test(requestKey)) {
+            throw fail(400, "valid Idempotency-Key required");
+          }
+          const isSubmission = programParts.length === 2;
+          const body = await readBody(req, isSubmission ? 49_152 : 4096);
+          const targetSub = isSubmission ? null : submissions.get(programParts[2]);
+          if (!isSubmission && (!targetSub || targetSub.programId !== item.id || targetSub.authorId !== dynActor.id)) {
+            return json(res, 404, { error: "submission not found" });
+          }
+          const action = isSubmission ? "submission" : `run:${targetSub.id}`;
+          const scopedKey = `${item.id}:${dynActor.id}:${action}:${requestKey}`;
+          const fingerprint = sha(JSON.stringify([item.id, dynActor.id, action, body]));
+          const prior = idempotency.get(scopedKey);
+          if (prior) {
+            return prior.fingerprint === fingerprint
+              ? json(res, isSubmission ? 201 : 202, isSubmission ? submissions.get(prior.id) : { id: prior.id, state: jobs.get(prior.id).state })
+              : json(res, 409, { error: "idempotency key reused for a different request" });
+          }
+          if (isSubmission) {
+            if (!body || typeof body !== "object" || Array.isArray(body)) throw fail(400, "invalid submission payload");
+            const allowedKeys = new Set(["targetRevision", "report", "pocFileName", "pocSource", "testContract"]);
+            if (Object.keys(body).some(k => !allowedKeys.has(k))) throw fail(400, "unexpected submission fields");
+            if (typeof body.targetRevision !== "string" || body.targetRevision.trim().toLowerCase() !== item.sourceRevision) {
+              throw fail(400, "targetRevision must match program pinned sourceRevision");
+            }
+            if (!validStructuredReport(body.report)) throw fail(400, "valid structured report is required");
+            const validPoc = validateArbitraryInput({
+              sourceUrl: item.sourceUrl,
+              sourceRevision: item.sourceRevision,
+              pocFileName: body.pocFileName,
+              pocSource: body.pocSource,
+              testContract: body.testContract ?? "ExploitTest",
+            });
+            const trimmedReport = {
+              title: body.report.title.trim(),
+              location: body.report.location.trim(),
+              rootCause: body.report.rootCause.trim(),
+              impact: body.report.impact.trim(),
+              invariant: body.report.invariant.trim(),
+              reproduction: body.report.reproduction.trim(),
+              ...(body.report.tools?.trim() ? { tools: body.report.tools.trim() } : {}),
+            };
+            const sub = {
+              id: randomUUID(),
+              programId: item.id,
+              authorId: dynActor.id,
+              targetRevision: item.sourceRevision,
+              report: trimmedReport,
+              pocFileName: validPoc.pocFileName,
+              pocSource: validPoc.pocSource,
+              ...(body.testContract !== undefined ? { testContract: validPoc.testContract } : {}),
+              createdAt: new Date(now()).toISOString(),
+              jobIds: [],
+            };
+            submissions.set(sub.id, sub);
+            idempotency.set(scopedKey, { fingerprint, id: sub.id });
+            return json(res, 201, sub);
+          }
+          if (!body || typeof body !== "object" || Array.isArray(body)
+            || Object.keys(body).sort().join() !== "artifactFormat,testContract"
+            || body.artifactFormat !== "arbitrary-poc-v1") {
+            throw fail(400, "artifactFormat 'arbitrary-poc-v1' and testContract are required");
+          }
+          const validRun = validateArbitraryInput({
+            sourceUrl: item.sourceUrl,
+            sourceRevision: item.sourceRevision,
+            pocFileName: targetSub.pocFileName,
+            pocSource: targetSub.pocSource,
+            testContract: body.testContract,
+          });
+          const usedRuns = dynamicProgramRuns.get(item.id) ?? 0;
+          if (usedRuns >= item.runLimit) throw fail(429, "program run limit reached");
+          if (jobs.size >= maxJobs) throw fail(503, "job capacity reached; restart local server after reviewing results");
+          const job = {
+            id: randomUUID(),
+            programId: item.id,
+            authorId: dynActor.id,
+            submissionId: targetSub.id,
+            kind: "arbitrary-verify",
+            body: {
+              sourceUrl: validRun.sourceUrl,
+              sourceRevision: validRun.sourceRevision,
+              pocFileName: validRun.pocFileName,
+              pocSource: validRun.pocSource,
+              testContract: validRun.testContract,
+              artifactFormat: "arbitrary-poc-v1",
+            },
+            state: "queued",
+            result: null,
+            createdAt: new Date(now()).toISOString(),
+          };
+          jobs.set(job.id, job);
+          targetSub.jobIds.push(job.id);
+          dynamicProgramRuns.set(item.id, usedRuns + 1);
+          idempotency.set(scopedKey, { fingerprint, id: job.id });
+          queue.push(job);
+          pump();
+          return json(res, 202, { id: job.id, state: job.state });
+        }
         if (!isOwner || !account) return json(res, 403, { error: "owner account required" });
         if (req.method === "POST" && programParts.length === 2 && programParts[1] === "invitations") {
           const body = await readBody(req);
